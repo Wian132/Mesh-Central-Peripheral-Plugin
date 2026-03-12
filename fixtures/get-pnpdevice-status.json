@@ -1,0 +1,48 @@
+[
+  {
+    "FriendlyName": "Epson TM-T88VI Receipt",
+    "Class": "Printer",
+    "InstanceId": "USBPRINT\\EPSONTM-T88VI123",
+    "Manufacturer": "EPSON",
+    "Status": "OK",
+    "Present": true,
+    "Problem": 0,
+    "Service": "usbprint"
+  },
+  {
+    "FriendlyName": "Verifone VX820 Pin Pad",
+    "Class": "Ports",
+    "InstanceId": "USB\\VID_11CA&PID_0200\\TERM001",
+    "Manufacturer": "Verifone",
+    "Status": "OK",
+    "Present": true,
+    "Problem": 0,
+    "Service": "usbser"
+  },
+  {
+    "FriendlyName": "Dell P2219H",
+    "Class": "Monitor",
+    "InstanceId": "DISPLAY\\DELA0B5\\4&2BC8C1B8&0&UID4357",
+    "Manufacturer": "Dell",
+    "Status": "OK",
+    "Present": true,
+    "Problem": 0
+  },
+  {
+    "FriendlyName": "Honeywell Xenon Scanner",
+    "Class": "Image",
+    "InstanceId": "USB\\VID_0C2E&PID_0B61\\SCAN001",
+    "Manufacturer": "Honeywell",
+    "Status": "OK",
+    "Present": true,
+    "Problem": 0
+  },
+  {
+    "FriendlyName": "HID Keyboard Device",
+    "Class": "Keyboard",
+    "InstanceId": "HID\\VID_046D&PID_C31C\\KBD001",
+    "Manufacturer": "Logitech",
+    "Status": "OK",
+    "Present": true
+  }
+]

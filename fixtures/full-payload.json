@@ -1,0 +1,90 @@
+{
+  "printers": {
+    "method": "Get-Printer",
+    "items": [
+      {
+        "Name": "Epson TM-T88VI Receipt",
+        "PrinterStatus": 3,
+        "WorkOffline": false,
+        "PortName": "USB001",
+        "Status": "Idle"
+      }
+    ]
+  },
+  "pnpDevices": {
+    "method": "Get-PnpDevice",
+    "items": [
+      {
+        "FriendlyName": "Verifone VX820 Pin Pad",
+        "Class": "Ports",
+        "InstanceId": "USB\\VID_11CA&PID_0200\\TERM001",
+        "Manufacturer": "Verifone",
+        "Status": "OK",
+        "Present": true
+      },
+      {
+        "FriendlyName": "Honeywell Xenon Scanner",
+        "Class": "Image",
+        "InstanceId": "USB\\VID_0C2E&PID_0B61\\SCAN001",
+        "Manufacturer": "Honeywell",
+        "Status": "OK",
+        "Present": true
+      },
+      {
+        "FriendlyName": "Dell P2219H",
+        "Class": "Monitor",
+        "InstanceId": "DISPLAY\\DELA0B5\\4&2BC8C1B8&0&UID4357",
+        "Manufacturer": "Dell",
+        "Status": "OK",
+        "Present": true
+      }
+    ]
+  },
+  "pnpEntities": {
+    "method": "Win32_PnPEntity",
+    "items": [
+      {
+        "Name": "Verifone VX820 Pin Pad",
+        "PNPClass": "Ports",
+        "DeviceID": "USB\\VID_11CA&PID_0200\\TERM001",
+        "Manufacturer": "Verifone",
+        "Status": "OK",
+        "Present": true,
+        "Description": "USB Serial Device"
+      },
+      {
+        "Name": "Honeywell Xenon Scanner",
+        "PNPClass": "Image",
+        "DeviceID": "USB\\VID_0C2E&PID_0B61\\SCAN001",
+        "Manufacturer": "Honeywell",
+        "Status": "OK",
+        "Present": true,
+        "Description": "2D Barcode Scanner"
+      },
+      {
+        "Name": "Dell P2219H",
+        "PNPClass": "Monitor",
+        "DeviceID": "DISPLAY\\DELA0B5\\4&2BC8C1B8&0&UID4357",
+        "Manufacturer": "Dell",
+        "Status": "OK",
+        "Present": true,
+        "Description": "Wide screen monitor"
+      }
+    ]
+  },
+  "serialPorts": {
+    "method": "Win32_SerialPort",
+    "items": [
+      {
+        "Name": "Verifone VX820 (COM4)",
+        "DeviceID": "COM4",
+        "Description": "USB Serial Device (COM4)",
+        "PNPDeviceID": "USB\\VID_11CA&PID_0200\\TERM001",
+        "Status": "OK",
+        "Availability": 3,
+        "MaxBaudRate": 115200
+      }
+    ]
+  },
+  "warnings": []
+}

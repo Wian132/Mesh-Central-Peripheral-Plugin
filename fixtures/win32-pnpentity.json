@@ -1,0 +1,32 @@
+[
+  {
+    "Name": "Verifone VX820 Pin Pad",
+    "PNPClass": "Ports",
+    "DeviceID": "USB\\VID_11CA&PID_0200\\TERM001",
+    "Manufacturer": "Verifone",
+    "Status": "OK",
+    "Present": true,
+    "Description": "USB Serial Device",
+    "LocationInformation": "Port_#0003.Hub_#0001"
+  },
+  {
+    "Name": "Honeywell Xenon Scanner",
+    "PNPClass": "Image",
+    "DeviceID": "USB\\VID_0C2E&PID_0B61\\SCAN001",
+    "Manufacturer": "Honeywell",
+    "Status": "OK",
+    "Present": true,
+    "Description": "2D Barcode Scanner",
+    "LocationInformation": "Port_#0004.Hub_#0001"
+  },
+  {
+    "Name": "Dell P2219H",
+    "PNPClass": "Monitor",
+    "DeviceID": "DISPLAY\\DELA0B5\\4&2BC8C1B8&0&UID4357",
+    "Manufacturer": "Dell",
+    "Status": "OK",
+    "Present": true,
+    "Description": "Wide screen monitor",
+    "LocationInformation": "DISPLAYPORT"
+  }
+]

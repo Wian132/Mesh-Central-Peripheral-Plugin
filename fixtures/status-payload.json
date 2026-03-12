@@ -1,0 +1,43 @@
+{
+  "printers": {
+    "method": "Get-Printer",
+    "items": [
+      {
+        "Name": "Epson TM-T88VI Receipt",
+        "PrinterStatus": 3,
+        "WorkOffline": false,
+        "PortName": "USB001",
+        "Status": "Idle"
+      },
+      {
+        "Name": "Office Laser",
+        "PrinterStatus": 7,
+        "WorkOffline": true,
+        "PortName": "IP_10.0.0.15",
+        "Status": "Offline"
+      }
+    ]
+  },
+  "pnpDevices": {
+    "method": "Get-PnpDevice",
+    "items": [
+      {
+        "FriendlyName": "Epson TM-T88VI Receipt",
+        "Class": "Printer",
+        "InstanceId": "USBPRINT\\EPSONTM-T88VI123",
+        "Manufacturer": "EPSON",
+        "Status": "OK",
+        "Present": true
+      },
+      {
+        "FriendlyName": "Verifone VX820 Pin Pad",
+        "Class": "Ports",
+        "InstanceId": "USB\\VID_11CA&PID_0200\\TERM001",
+        "Manufacturer": "Verifone",
+        "Status": "OK",
+        "Present": true
+      }
+    ]
+  },
+  "warnings": []
+}

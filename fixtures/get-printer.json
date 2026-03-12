@@ -1,0 +1,16 @@
+[
+  {
+    "Name": "Epson TM-T88VI Receipt",
+    "PrinterStatus": 3,
+    "WorkOffline": false,
+    "PortName": "USB001",
+    "Status": "Idle"
+  },
+  {
+    "Name": "Office Laser",
+    "PrinterStatus": 7,
+    "WorkOffline": true,
+    "PortName": "IP_10.0.0.15",
+    "Status": "Offline"
+  }
+]

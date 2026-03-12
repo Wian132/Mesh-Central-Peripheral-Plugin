@@ -1,0 +1,11 @@
+[
+  {
+    "Name": "Verifone VX820 (COM4)",
+    "DeviceID": "COM4",
+    "Description": "USB Serial Device (COM4)",
+    "PNPDeviceID": "USB\\VID_11CA&PID_0200\\TERM001",
+    "Status": "OK",
+    "Availability": 3,
+    "MaxBaudRate": 115200
+  }
+]

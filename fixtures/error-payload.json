@@ -1,0 +1,14 @@
+{
+  "printers": {
+    "method": "none",
+    "items": []
+  },
+  "pnpDevices": {
+    "method": "none",
+    "items": []
+  },
+  "warnings": [
+    "Get-Printer failed: The term 'Get-Printer' is not recognized.",
+    "Win32_Printer fallback failed: Access denied."
+  ]
+}

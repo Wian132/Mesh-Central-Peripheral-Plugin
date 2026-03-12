@@ -1,0 +1,18 @@
+{
+  "name": "CentralRecon Peripherals",
+  "shortName": "centralreconperipherals",
+  "version": "0.1.0",
+  "author": "Wian Otto",
+  "description": "Windows peripheral telemetry for MeshCentral devices with scheduled status scans and full inventory snapshots.",
+  "hasAdminPanel": true,
+  "homepage": "https://github.com/Wian132/Mesh-Central-Peripheral-Plugin",
+  "changelogUrl": "https://raw.githubusercontent.com/Wian132/Mesh-Central-Peripheral-Plugin/main/CHANGELOG.md",
+  "configUrl": "https://raw.githubusercontent.com/Wian132/Mesh-Central-Peripheral-Plugin/main/config.json",
+  "downloadUrl": "https://github.com/Wian132/Mesh-Central-Peripheral-Plugin/archive/refs/heads/main.zip",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wian132/Mesh-Central-Peripheral-Plugin.git"
+  },
+  "versionHistoryUrl": "https://api.github.com/repos/Wian132/Mesh-Central-Peripheral-Plugin/tags",
+  "meshCentralCompat": ">=1.1.35"
+}

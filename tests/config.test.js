@@ -1,0 +1,59 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const { cloneDefaultConfig, sanitizeConfig } = require("../lib/config");
+
+test("default config matches planned cadence and concurrency", () => {
+    const config = cloneDefaultConfig();
+    assert.equal(config.schedule.enabled, false);
+    assert.equal(config.schedule.statusIntervalMinutes, 1);
+    assert.equal(config.schedule.fullIntervalMinutes, 15);
+    assert.equal(config.execution.maxConcurrentScans, 3);
+    assert.equal(config.schedule.advancedOneMinuteFullInventory, false);
+});
+
+test("full inventory at one minute requires advanced opt-in", () => {
+    const result = sanitizeConfig({
+        schedule: {
+            enabled: true,
+            statusIntervalMinutes: 1,
+            fullIntervalMinutes: 1,
+            advancedOneMinuteFullInventory: false
+        }
+    });
+
+    assert.ok(result.errors.some((error) => error.includes("fullIntervalMinutes")));
+});
+
+test("advanced full inventory mode allows one-minute full scans", () => {
+    const result = sanitizeConfig({
+        schedule: {
+            enabled: true,
+            statusIntervalMinutes: 1,
+            fullIntervalMinutes: 1,
+            advancedOneMinuteFullInventory: true
+        }
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.config.schedule.fullIntervalMinutes, 1);
+});
+
+test("invalid regex rules are rejected", () => {
+    const result = sanitizeConfig({
+        matching: {
+            paymentTerminals: [
+                {
+                    id: "bad",
+                    label: "Bad",
+                    role: "payment-terminal-candidate",
+                    nameRegex: "[broken"
+                }
+            ]
+        }
+    });
+
+    assert.ok(result.errors.some((error) => error.includes("nameRegex")));
+});
