@@ -29,7 +29,6 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     const obj = {};
     obj.parent = pluginHandler;
     obj.meshServer = pluginHandler.parent;
-    obj.webserver = obj.meshServer.webserver;
     obj.persistence = new Persistence(path.join(obj.meshServer.datapath, SHORT_NAME));
     obj.exports = ["onDeviceRefreshEnd"];
 
@@ -109,6 +108,10 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         return user && user.siteadmin === SITERIGHT_ADMIN;
     }
 
+    function getWebServer() {
+        return obj.meshServer ? obj.meshServer.webserver : null;
+    }
+
     function getDomainObjectForUser(user) {
         const domainId = user && user.domain ? user.domain : "";
         return obj.meshServer.config.domains[domainId] || obj.meshServer.config.domains[""];
@@ -116,8 +119,13 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     function getNodeAccess(user, nodeId) {
         return new Promise((resolve) => {
+            const webserver = getWebServer();
+            if (webserver == null || typeof webserver.GetNodeWithRights !== "function") {
+                resolve(null);
+                return;
+            }
             const domain = getDomainObjectForUser(user);
-            obj.webserver.GetNodeWithRights(domain, user, nodeId, (node, rights, visible) => {
+            webserver.GetNodeWithRights(domain, user, nodeId, (node, rights, visible) => {
                 if (node == null || visible === false) {
                     resolve(null);
                     return;
@@ -144,7 +152,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     function getMeshesForAdmin(user) {
         const domainId = user && user.domain ? user.domain : "";
-        return Object.values(obj.webserver.meshes)
+        const webserver = getWebServer();
+        if (webserver == null || webserver.meshes == null) { return []; }
+        return Object.values(webserver.meshes)
             .filter((mesh) => mesh && mesh.deleted == null && mesh.domain === domainId)
             .map((mesh) => ({
                 _id: mesh._id,
@@ -166,7 +176,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     }
 
     function getEligibleOnlineAgents() {
-        return Object.values(obj.webserver.wsagents)
+        const webserver = getWebServer();
+        if (webserver == null || webserver.wsagents == null) { return []; }
+        return Object.values(webserver.wsagents)
             .filter((agent) => agent && agent.dbNodeKey && agent.dbMeshKey && isNodeInScope(agent.dbNodeKey, agent.dbMeshKey));
     }
 
@@ -177,6 +189,8 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     function emitNodeEvent(nodeId, meshId, message, action, extra) {
         if (!meshId) { return; }
+        const webserver = getWebServer();
+        if (webserver == null || typeof webserver.CreateNodeDispatchTargets !== "function") { return; }
         const event = Object.assign({
             etype: "node",
             action: action || SHORT_NAME,
@@ -186,7 +200,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             username: DISPLAY_NAME,
             msg: message
         }, extra || {});
-        const targets = obj.webserver.CreateNodeDispatchTargets(meshId, nodeId, ["server-users"]);
+        const targets = webserver.CreateNodeDispatchTargets(meshId, nodeId, ["server-users"]);
         obj.meshServer.DispatchEvent(targets, obj, event);
     }
 
@@ -310,6 +324,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const state = loadState(nodeId, meshId);
         const now = nowMs();
         const timeoutMs = obj.runtime.config.execution.powershellTimeoutMs;
+        const webserver = getWebServer();
 
         if (obj.runtime.activeRequests.has(nodeId)) {
             if (mode === "full") {
@@ -320,7 +335,11 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             return { ok: false, queued: false, message: "A scan is already in progress for this device." };
         }
 
-        const agent = obj.webserver.wsagents[nodeId];
+        if (webserver == null || webserver.wsagents == null) {
+            return { ok: false, queued: false, message: "MeshCentral webserver is not ready yet." };
+        }
+
+        const agent = webserver.wsagents[nodeId];
         if (agent == null) {
             return { ok: false, queued: false, message: "The device agent is not connected." };
         }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8
+
+- Fixed a MeshCentral startup-order bug where the plugin could cache a null `webserver` reference and crash the server when opening device pages.
+- Resolved webserver access lazily at request/dispatch time so plugin routes stay safe after server restarts.
+- Added a regression test covering delayed webserver attachment.
+
 ## 0.1.7
 
 - Added CPU, RAM, OS, and uptime collection from Windows via `Win32_Processor` and `Win32_OperatingSystem`.
