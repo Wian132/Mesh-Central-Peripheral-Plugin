@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.14
+
+- Optimized the meshcore PowerShell collector for slow POS hardware that was timing out at 120 seconds.
+- Full scans now use `Get-PnpDevice -PresentOnly` instead of enumerating all historical/ghost devices (typically 10x fewer items).
+- Removed the redundant `Win32_PnPEntity` WMI query from full scans; `Get-PnpDevice` already covers the same devices.
+- Replaced `Test-Connection` ping calls with direct `System.Net.NetworkInformation.Ping` using a hard 2-second timeout, eliminating cmdlet startup overhead and long blocking waits on flaky networks.
+- Status scans also use `-PresentOnly` consistently now.
+
 ## 0.1.13
 
 - Replaced broken HTTP-to-middleware telemetry export with direct Supabase PostgREST inserts into `server_telemetry`.

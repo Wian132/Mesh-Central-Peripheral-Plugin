@@ -48,6 +48,15 @@ function buildPowerShellScript(mode, outputPath) {
         "$ErrorActionPreference = 'Stop'",
         "$warnings = New-Object System.Collections.ArrayList",
         "function Add-Warning([string]$Message) { if ($Message) { [void]$warnings.Add($Message) } }",
+        "function Quick-Ping([string]$Target, [int]$TimeoutMs) {",
+        "  try {",
+        "    $p = New-Object System.Net.NetworkInformation.Ping",
+        "    $r = $p.Send($Target, $TimeoutMs)",
+        "    if ($r.Status -eq 'Success') { return [double]$r.RoundtripTime }",
+        "    return $null",
+        "  } catch { return $null }",
+        "  finally { if ($p) { $p.Dispose() } }",
+        "}",
         "function Get-PrinterItems {",
         "  try {",
         "    return @{ method = 'Get-Printer'; items = @(Get-Printer | Select-Object Name,PrinterStatus,WorkOffline,PortName,Status,ComputerName) }",
@@ -71,13 +80,9 @@ function buildPowerShellScript(mode, outputPath) {
         "    $manufacturer -match '(epson|star|bixolon|verifone|ingenico|pax|castles)'",
         "  } | Select-Object FriendlyName,Class,InstanceId,Manufacturer,Status,Present,Problem,Service,Location)",
         "}",
-        "function Get-PnpItems([bool]$PresentOnly) {",
+        "function Get-PnpItems {",
         "  try {",
-        "    if ($PresentOnly) {",
-        "      $items = @(Get-PnpDevice -PresentOnly | Select-Object FriendlyName,Class,InstanceId,Manufacturer,Status,Present,Problem,Service,Location)",
-        "    } else {",
-        "      $items = @(Get-PnpDevice | Select-Object FriendlyName,Class,InstanceId,Manufacturer,Status,Present,Problem,Service,Location)",
-        "    }",
+        "    $items = @(Get-PnpDevice -PresentOnly | Select-Object FriendlyName,Class,InstanceId,Manufacturer,Status,Present,Problem,Service,Location)",
         "    return @{ method = 'Get-PnpDevice'; items = $items }",
         "  } catch {",
         "    Add-Warning('Get-PnpDevice failed: ' + $_.Exception.Message)",
@@ -87,14 +92,6 @@ function buildPowerShellScript(mode, outputPath) {
         "      Add-Warning('Win32_PnPEntity fallback failed: ' + $_.Exception.Message)",
         "      return @{ method = 'none'; items = @() }",
         "    }",
-        "  }",
-        "}",
-        "function Get-PnpEntityItems {",
-        "  try {",
-        "    return @{ method = 'Win32_PnPEntity'; items = @(Get-CimInstance Win32_PnPEntity | Select-Object Name,PNPClass,DeviceID,Manufacturer,Status,Present,Service,Description,LocationInformation) }",
-        "  } catch {",
-        "    Add-Warning('Win32_PnPEntity failed: ' + $_.Exception.Message)",
-        "    return @{ method = 'none'; items = @() }",
         "  }",
         "}",
         "function Get-SerialPortItems {",
@@ -139,12 +136,7 @@ function buildPowerShellScript(mode, outputPath) {
         "      $ipv4 = @($primaryConfig.IPAddress | Where-Object { $_ -match '^\\d{1,3}(\\.\\d{1,3}){3}$' }) | Select-Object -First 1",
         "      if ($ipv4) { $networkInfo.ipAddress = [string]$ipv4 }",
         "      $gateway = @($primaryConfig.DefaultIPGateway | Where-Object { $_ -match '^\\d{1,3}(\\.\\d{1,3}){3}$' }) | Select-Object -First 1",
-        "      if ($gateway) {",
-        "        try {",
-        "          $gatewayPing = Test-Connection -ComputerName $gateway -Count 1 -ErrorAction Stop | Select-Object -First 1",
-        "          if ($gatewayPing) { $networkInfo.gatewayPingMs = [double]$gatewayPing.ResponseTime }",
-        "        } catch { }",
-        "      }",
+        "      if ($gateway) { $networkInfo.gatewayPingMs = Quick-Ping $gateway 2000 }",
         "    }",
         "    try {",
         "      $adapter = Get-NetAdapter -Physical -ErrorAction Stop | Where-Object { $_.Status -eq 'Up' } | Select-Object -First 1",
@@ -155,10 +147,7 @@ function buildPowerShellScript(mode, outputPath) {
         "    } catch {",
         "      Add-Warning('Get-NetAdapter failed: ' + $_.Exception.Message)",
         "    }",
-        "    try {",
-        "      $internetPing = Test-Connection -ComputerName '1.1.1.1' -Count 1 -ErrorAction Stop | Select-Object -First 1",
-        "      if ($internetPing) { $networkInfo.internetPingMs = [double]$internetPing.ResponseTime }",
-        "    } catch { }",
+        "    $networkInfo.internetPingMs = Quick-Ping '1.1.1.1' 2000",
         "    if ($networkInfo.linkType -eq 'wifi') {",
         "      try {",
         "        $wlanLines = @(netsh wlan show interfaces 2>$null)",
@@ -184,11 +173,10 @@ function buildPowerShellScript(mode, outputPath) {
     ];
 
     if (statusOnly) {
-        lines.push("$result.pnpDevices = Get-PnpItems $true");
+        lines.push("$result.pnpDevices = Get-PnpItems");
         lines.push("if ($result.pnpDevices.method -eq 'Get-PnpDevice') { $result.pnpDevices.items = Select-StatusDevices $result.pnpDevices.items }");
     } else {
-        lines.push("$result.pnpDevices = Get-PnpItems $false");
-        lines.push("$result.pnpEntities = Get-PnpEntityItems");
+        lines.push("$result.pnpDevices = Get-PnpItems");
         lines.push("$result.serialPorts = Get-SerialPortItems");
     }
 
