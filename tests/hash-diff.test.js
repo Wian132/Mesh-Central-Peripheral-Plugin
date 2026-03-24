@@ -34,6 +34,18 @@ test("snapshot hashes remain stable regardless of array order", () => {
     assert.equal(first.snapshotHash, second.snapshotHash);
 });
 
+test("snapshot hashes ignore CPU and memory telemetry changes", () => {
+    const fixture = readFixture("full-payload.json");
+    const mutated = JSON.parse(JSON.stringify(fixture));
+    mutated.system.cpu[0].LoadPercentage = 88;
+    mutated.system.operatingSystem[0].FreePhysicalMemory = 3145728;
+
+    const first = normalizeFullPayload(fixture, buildCompiledMatching());
+    const second = normalizeFullPayload(mutated, buildCompiledMatching());
+
+    assert.equal(first.snapshotHash, second.snapshotHash);
+});
+
 test("full diff detects added peripherals", () => {
     const fixture = readFixture("full-payload.json");
     const first = normalizeFullPayload(fixture, buildCompiledMatching());

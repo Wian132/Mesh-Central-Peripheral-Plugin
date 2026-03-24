@@ -105,7 +105,23 @@ function buildPowerShellScript(mode, outputPath) {
         "    return @{ method = 'none'; items = @() }",
         "  }",
         "}",
+        "function Get-SystemInfo {",
+        "  $cpuItems = @()",
+        "  $osItems = @()",
+        "  try {",
+        "    $cpuItems = @(Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed,LoadPercentage,Manufacturer)",
+        "  } catch {",
+        "    Add-Warning('Win32_Processor failed: ' + $_.Exception.Message)",
+        "  }",
+        "  try {",
+        "    $osItems = @(Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,CSName,LastBootUpTime,TotalVisibleMemorySize,FreePhysicalMemory,TotalVirtualMemorySize,FreeVirtualMemory)",
+        "  } catch {",
+        "    Add-Warning('Win32_OperatingSystem failed: ' + $_.Exception.Message)",
+        "  }",
+        "  return @{ cpu = $cpuItems; operatingSystem = $osItems }",
+        "}",
         "$result = @{ platform = $env:OS; warnings = @() }",
+        "$result.system = Get-SystemInfo",
         "$result.printers = Get-PrinterItems"
     ];
 

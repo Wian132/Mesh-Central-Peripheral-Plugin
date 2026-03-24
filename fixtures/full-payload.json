@@ -86,5 +86,29 @@
       }
     ]
   },
+  "system": {
+    "cpu": [
+      {
+        "Name": "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz",
+        "NumberOfCores": 6,
+        "NumberOfLogicalProcessors": 6,
+        "MaxClockSpeed": 3000,
+        "LoadPercentage": 31,
+        "Manufacturer": "GenuineIntel"
+      }
+    ],
+    "operatingSystem": [
+      {
+        "Caption": "Microsoft Windows 10 Pro",
+        "Version": "10.0.19045",
+        "CSName": "FISHMAIN5",
+        "LastBootUpTime": "2026-03-24T05:30:00.000Z",
+        "TotalVisibleMemorySize": 16777216,
+        "FreePhysicalMemory": 6291456,
+        "TotalVirtualMemorySize": 25165824,
+        "FreeVirtualMemory": 10485760
+      }
+    ]
+  },
   "warnings": []
 }

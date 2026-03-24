@@ -206,11 +206,19 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         return isFullSiteAdmin(user) || ((rights & MESHRIGHT_REMOTECOMMAND) !== 0);
     }
 
+    function setNoCacheHeaders(res) {
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+    }
+
     function buildViewState(state) {
         const warnings = uniqueStrings([
             ...(state.statusSnapshot && state.statusSnapshot.warnings ? state.statusSnapshot.warnings : []),
             ...(state.fullSnapshot && state.fullSnapshot.warnings ? state.fullSnapshot.warnings : [])
         ]);
+        const statusSystemSummary = state.statusSnapshot ? state.statusSnapshot.systemSummary : null;
+        const fullSystemSummary = state.fullSnapshot ? state.fullSnapshot.systemSummary : null;
         const printers = state.statusSnapshot && state.statusSnapshot.printers && state.statusSnapshot.printers.length > 0
             ? state.statusSnapshot.printers
             : (state.fullSnapshot ? state.fullSnapshot.printers : []);
@@ -220,6 +228,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const nextStatusScanAt = state.scheduler && state.scheduler.nextStatusScanAt ? state.scheduler.nextStatusScanAt : null;
         const nextFullScanAt = state.scheduler && state.scheduler.nextFullScanAt ? state.scheduler.nextFullScanAt : null;
         const nextDueAt = [nextStatusScanAt, nextFullScanAt].filter(Boolean).sort()[0] || null;
+        const systemSummary = (state.lastStatusScanAt || 0) >= (state.lastFullScanAt || 0)
+            ? (statusSystemSummary || fullSystemSummary)
+            : (fullSystemSummary || statusSystemSummary);
 
         return {
             nodeId: state.nodeId,
@@ -235,6 +246,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             nextStatusScanAt,
             nextFullScanAt,
             nextDueAt,
+            systemSummary,
             printers,
             peripherals: state.fullSnapshot ? state.fullSnapshot.peripherals : [],
             paymentTerminalCandidates,
@@ -542,6 +554,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     obj.handleAdminReq = async function (req, res, user) {
         if (req.query.api === "admin-state") {
             if (!isFullSiteAdmin(user)) { res.sendStatus(401); return; }
+            setNoCacheHeaders(res);
             res.json({
                 config: obj.runtime.config,
                 meshes: getMeshesForAdmin(user)
@@ -553,6 +566,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             const access = await getNodeAccess(user, req.query.nodeid);
             if (!access) { res.sendStatus(401); return; }
             const state = loadState(access.node._id, access.node.meshid);
+            setNoCacheHeaders(res);
             res.json(buildViewState(state));
             return;
         }
@@ -562,6 +576,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             if (!access) { res.sendStatus(401); return; }
             const state = loadState(access.node._id, access.node.meshid);
             const apiBase = "/pluginadmin.ashx?pin=" + SHORT_NAME + "&user=1&view=device";
+            setNoCacheHeaders(res);
             res.set("Content-Type", "text/html; charset=utf-8");
             res.send(renderDevicePage({
                 title: DISPLAY_NAME,
@@ -574,6 +589,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         }
 
         if (!isFullSiteAdmin(user)) { res.sendStatus(401); return; }
+        setNoCacheHeaders(res);
         res.set("Content-Type", "text/html; charset=utf-8");
         res.send(renderAdminPage({
             title: DISPLAY_NAME + " Settings",

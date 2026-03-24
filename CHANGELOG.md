@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7
+
+- Added CPU, RAM, OS, and uptime collection from Windows via `Win32_Processor` and `Win32_OperatingSystem`.
+- Surfaced system telemetry in the device tab without treating normal CPU/RAM fluctuation as an inventory-change event.
+- Added no-cache headers for plugin HTML/API responses so upgraded UI changes show up more reliably after plugin updates.
+
 ## 0.1.6
 
 - Improved the device tab to default to a more meaningful POS-focused view instead of a raw Windows inventory dump.

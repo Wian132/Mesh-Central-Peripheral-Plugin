@@ -29,6 +29,10 @@ test("status normalization tracks printers and payment terminal hints", () => {
     assert.equal(snapshot.printers.length, 2);
     assert.equal(snapshot.printers[1].isOffline, true);
     assert.ok(snapshot.paymentTerminalCandidates.some((candidate) => /verifone/i.test(candidate.name)));
+    assert.equal(snapshot.systemSummary.cpu.totalCores, 6);
+    assert.equal(snapshot.systemSummary.cpu.loadPercent, 27);
+    assert.equal(snapshot.systemSummary.memory.usedPercent, 63);
+    assert.equal(snapshot.systemSummary.operatingSystem.computerName, "FISHMAIN5");
     assert.ok(snapshot.snapshotHash);
 });
 
@@ -40,6 +44,8 @@ test("full normalization merges PnP and serial data into meaningful peripherals"
     assert.ok(snapshot.peripherals.some((peripheral) => peripheral.type === "scanner"));
     assert.ok(snapshot.peripherals.some((peripheral) => peripheral.type === "display"));
     assert.ok(snapshot.peripherals.some((peripheral) => peripheral.serialPort === "COM4"));
+    assert.equal(snapshot.systemSummary.cpu.model, "Intel(R) Core(TM) i5-8500 CPU @ 3.00GHz");
+    assert.equal(snapshot.systemSummary.memory.totalBytes, 17179869184);
 });
 
 test("command-output parser converts single objects to arrays", () => {
