@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.10
+
+- Fixed a client-side script escaping regression that could leave the device page shell visible but the content area blank.
+- Added a regression test that syntax-checks the rendered device-page browser script.
+
 ## 0.1.9
 
 - Added extra bottom padding to the device page so the lower tables are easier to reach inside MeshCentral.
