@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- Removed explicit `utf8` file-encoding arguments from the meshcore collector file I/O to avoid the live agent `unsupported encoding in method 'handleServerCommand()'` exception.
+
 ## 0.1.4
 
 - Adjusted the meshcore PowerShell argument list to explicit tokens while keeping the temp-file/stdin execution pattern.

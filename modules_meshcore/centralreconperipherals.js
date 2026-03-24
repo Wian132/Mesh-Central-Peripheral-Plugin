@@ -146,7 +146,7 @@ function runScan(args) {
     var child = null;
 
     try {
-        fs.writeFileSync(paths.scriptPath, buildPowerShellScript(args.mode, paths.outputPath) + "\r\n", "utf8");
+        fs.writeFileSync(paths.scriptPath, buildPowerShellScript(args.mode, paths.outputPath) + "\r\n");
         child = require("child_process").execFile(getPowerShellPath(), getPowerShellArgs());
     } catch (error) {
         cleanupFiles(paths);
@@ -201,7 +201,7 @@ function runScan(args) {
 
         var output = "";
         try {
-            output = fs.readFileSync(paths.outputPath, "utf8").toString().trim();
+            output = fs.readFileSync(paths.outputPath).toString().trim();
         } catch (error) { }
         cleanupFiles(paths);
 
