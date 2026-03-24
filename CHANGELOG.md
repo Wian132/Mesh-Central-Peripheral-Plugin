@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.13
+
+- Replaced broken HTTP-to-middleware telemetry export with direct Supabase PostgREST inserts into `server_telemetry`.
+- Added `supabaseUrl` and `supabaseAnonKey` config fields under `integrations.famousRecon`; when set, the plugin resolves `server_id` from `fleet_servers` by `mesh_node_id` and inserts telemetry rows directly.
+- Legacy HTTP endpoint fields (`endpointUrl`, `apiKey`) are preserved for backward compatibility but ignored when Supabase is configured.
+- Added Supabase URL and anon key input fields to the plugin admin panel.
+- Created RLS policies on FamousRecon Supabase: `plugin_lookup_fleet_server` (SELECT on `fleet_servers`), `plugin_insert_telemetry` (INSERT on `server_telemetry`), `plugin_read_own_telemetry` and `plugin_delete_own_telemetry` (scoped to `collector_kind = 'meshcentral_plugin'`).
+- Added unit tests for `buildSupabaseRow`, `resolveServerId`, and `sendTelemetryToSupabase`.
+- Added E2E test (`tests/supabase-e2e.test.js`) that inserts, verifies, and cleans up a real telemetry row against live Supabase.
+- Rows inserted by the plugin use `telemetry_source = 'agent'` and `collector_kind = 'meshcentral_plugin'`.
+
 ## 0.1.12
 
 - Famous Recon export: detailed plugin debug lines for each attempt (URL host/path, masked `x-api-key`, header set, payload size, key `metrics.*` fields), HTTP status on success, and truncated error bodies on failure; explicit skip reasons when export is enabled but gated by `exportOnStatusScans` / `exportOnFullScans` or missing CSName/nodeId.

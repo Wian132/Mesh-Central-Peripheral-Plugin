@@ -24,6 +24,7 @@ const {
     buildExportAttemptLogLine,
     buildTelemetryPayload,
     sendTelemetry,
+    sendTelemetryToSupabase,
     truncateForLog
 } = require("./lib/famous-recon");
 const { safeJsonParse, uniqueStrings } = require("./lib/utils");
@@ -546,8 +547,25 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             inventoryChanged: mode === "full" ? Boolean(state.changedSincePrevious) : false
         });
 
-        logFamousReconDebug("Famous Recon export attempt: scanMode=" + mode + " | " + buildExportAttemptLogLine(integration, payload));
+        const useSupabase = String(integration.supabaseUrl || "").trim() !== "";
 
+        if (useSupabase) {
+            logFamousReconDebug("Supabase export attempt: scanMode=" + mode + " nodeId=" + String(viewState.nodeId || "") + " deviceId=" + deviceId);
+            const result = await sendTelemetryToSupabase(integration, payload);
+            if (result.skipped) {
+                logFamousReconDebug("Supabase export skipped: " + String(result.reason || "internal skip"));
+                return;
+            }
+            if (result.ok) {
+                logFamousReconDebug("Supabase export ok: deviceId=" + deviceId + " serverId=" + (result.serverId || "n/a") + " httpStatus=" + (result.status != null ? result.status : "n/a"));
+                return;
+            }
+            const statusPart = result.status != null ? (" httpStatus=" + result.status) : "";
+            logFamousReconDebug("Supabase export failed: deviceId=" + deviceId + statusPart + " — " + truncateForLog(result.error || "unknown error", 500));
+            return;
+        }
+
+        logFamousReconDebug("Famous Recon export attempt: scanMode=" + mode + " | " + buildExportAttemptLogLine(integration, payload));
         const result = await sendTelemetry(integration, payload);
         if (result.skipped) {
             logFamousReconDebug("Famous Recon export skipped: " + String(result.reason || "sendTelemetry internal skip"));
