@@ -79,7 +79,7 @@ test("telemetry payload converts system summary and inventory into Famous Recon 
         ]
     }, {
         scanMode: "full",
-        pluginVersion: "0.1.11",
+        pluginVersion: "0.1.12",
         deviceId: "DEBMAIN2",
         deviceType: "pos",
         inventoryChanged: true

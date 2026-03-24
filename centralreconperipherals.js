@@ -20,7 +20,12 @@ const {
     shouldQueueFullAfterStatusChange
 } = require("./lib/scheduler");
 const { renderAdminPage, renderDevicePage } = require("./lib/ui");
-const { buildTelemetryPayload, sendTelemetry } = require("./lib/famous-recon");
+const {
+    buildExportAttemptLogLine,
+    buildTelemetryPayload,
+    sendTelemetry,
+    truncateForLog
+} = require("./lib/famous-recon");
 const { safeJsonParse, uniqueStrings } = require("./lib/utils");
 
 const SITERIGHT_ADMIN = 0xFFFFFFFF;
@@ -497,14 +502,26 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         emitFullInventoryEvents(state, diff);
     }
 
+    function logFamousReconDebug(message) {
+        obj.meshServer.debug("plugin", SHORT_NAME + ": " + message);
+    }
+
     async function exportTelemetryIfConfigured(state, mode) {
         const integration = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
             ? obj.runtime.config.integrations.famousRecon
             : null;
 
-        if (integration == null || integration.enabled !== true) { return; }
-        if (mode === "status" && integration.exportOnStatusScans !== true) { return; }
-        if (mode === "full" && integration.exportOnFullScans !== true) { return; }
+        if (integration == null || integration.enabled !== true) {
+            return;
+        }
+        if (mode === "status" && integration.exportOnStatusScans !== true) {
+            logFamousReconDebug("Famous Recon export skipped: exportOnStatusScans is false (scan mode=status).");
+            return;
+        }
+        if (mode === "full" && integration.exportOnFullScans !== true) {
+            logFamousReconDebug("Famous Recon export skipped: exportOnFullScans is false (scan mode=full).");
+            return;
+        }
 
         const viewState = buildViewState(state);
         const systemSummary = viewState.systemSummary || {};
@@ -512,7 +529,12 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const deviceId = String(operatingSystem.computerName || "").trim();
 
         if (deviceId === "" || !viewState.nodeId) {
-            obj.meshServer.debug("plugin", SHORT_NAME + ": skipping Famous Recon export because the scan did not include a stable computer name.");
+            logFamousReconDebug(
+                "Famous Recon export skipped: missing Windows computer name (CSName) or nodeId. nodeId=" +
+                String(viewState.nodeId || "") +
+                " computerName=" +
+                (deviceId === "" ? "(empty)" : deviceId)
+            );
             return;
         }
 
@@ -524,10 +546,21 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             inventoryChanged: mode === "full" ? Boolean(state.changedSincePrevious) : false
         });
 
+        logFamousReconDebug("Famous Recon export attempt: scanMode=" + mode + " | " + buildExportAttemptLogLine(integration, payload));
+
         const result = await sendTelemetry(integration, payload);
-        if (!result.ok && !result.skipped) {
-            obj.meshServer.debug("plugin", SHORT_NAME + ": Famous Recon export failed for " + deviceId + ": " + (result.error || "unknown error"));
+        if (result.skipped) {
+            logFamousReconDebug("Famous Recon export skipped: " + String(result.reason || "sendTelemetry internal skip"));
+            return;
         }
+        if (result.ok) {
+            logFamousReconDebug("Famous Recon export ok: deviceId=" + deviceId + " httpStatus=" + (result.status != null ? result.status : "n/a"));
+            return;
+        }
+        const statusPart = result.status != null ? (" httpStatus=" + result.status) : "";
+        logFamousReconDebug(
+            "Famous Recon export failed: deviceId=" + deviceId + statusPart + " — " + truncateForLog(result.error || "unknown error", 500)
+        );
     }
 
     function handleScanResult(command, sourceAgent) {

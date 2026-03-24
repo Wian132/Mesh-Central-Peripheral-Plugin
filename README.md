@@ -163,6 +163,8 @@ Optional CentralRecon dashboard export:
 - set `integrations.famousRecon.deviceType` to `pos` or `other` for this rollout lane
 - keep server devices on the existing server telemetry lane rather than exporting them through this plugin
 
+Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
+
 ## Testing
 
 Automated tests:

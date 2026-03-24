@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12
+
+- Famous Recon export: detailed plugin debug lines for each attempt (URL host/path, masked `x-api-key`, header set, payload size, key `metrics.*` fields), HTTP status on success, and truncated error bodies on failure; explicit skip reasons when export is enabled but gated by `exportOnStatusScans` / `exportOnFullScans` or missing CSName/nodeId.
+- Added `scripts/verify-famous-recon-deploy.sh` for on-server checks (installed plugin version, `lib/famous-recon.js` presence, masked runtime `integrations.famousRecon` settings, log correlation hints).
+
 ## 0.1.11
 
 - Fixed device-page timestamp rendering so `Last Full Scan` and `Next Due` stay human-readable when MeshCentral stores scan times as epoch milliseconds.
