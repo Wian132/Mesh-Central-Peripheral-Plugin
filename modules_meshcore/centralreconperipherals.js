@@ -8,8 +8,12 @@ function getPowerShellPath() {
     return winDir + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
 }
 
-function getPowerShellArgs() {
-    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-Command", "-"];
+function encodePowerShellCommand(script) {
+    return Buffer.from(String(script || ""), "utf16le").toString("base64");
+}
+
+function getPowerShellArgs(script) {
+    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePowerShellCommand(script)];
 }
 
 function sendResult(args, status, payload, error, warnings) {
@@ -123,9 +127,10 @@ function runScan(args) {
     var stdout = "";
     var stderr = "";
     var completed = false;
+    var script = buildPowerShellScript(args.mode) + "\r\nexit\r\n";
     var child = require("child_process").execFile(
         getPowerShellPath(),
-        getPowerShellArgs(),
+        getPowerShellArgs(script),
         {}
     );
 
@@ -148,6 +153,13 @@ function runScan(args) {
     child.stderr.on("data", function (chunk) {
         stderr += chunk.toString();
     });
+    child.on("error", function (error) {
+        if (completed) { return; }
+        completed = true;
+        clearTimeout(timeout);
+        activeScan = null;
+        sendResult(args, "error", null, "Unable to start PowerShell: " + (error && error.message ? error.message : String(error)), []);
+    });
     child.on("exit", function (code) {
         if (completed) { return; }
         completed = true;
@@ -155,7 +167,13 @@ function runScan(args) {
         activeScan = null;
 
         if (stdout.trim() === "") {
-            sendResult(args, "error", null, stderr.trim() || ("PowerShell returned no JSON output (exit code " + code + ")."), []);
+            sendResult(
+                args,
+                "error",
+                null,
+                stderr.trim() || ("PowerShell returned no JSON output (exit code " + code + ", stdout bytes " + stdout.length + ", stderr bytes " + stderr.length + ")."),
+                []
+            );
             return;
         }
 
@@ -170,9 +188,6 @@ function runScan(args) {
         }
     });
 
-    child.stdin.write(buildPowerShellScript(args.mode));
-    child.stdin.write("\r\nexit\r\n");
-    child.stdin.end();
 }
 
 function consoleaction(args, rights, sessionid, parent) {
@@ -183,6 +198,7 @@ function consoleaction(args, rights, sessionid, parent) {
 
 module.exports = {
     consoleaction: consoleaction,
+    encodePowerShellCommand: encodePowerShellCommand,
     getPowerShellArgs: getPowerShellArgs,
     getPowerShellPath: getPowerShellPath
 };

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Switched the meshcore collector from stdin-fed PowerShell commands to `-EncodedCommand` for better compatibility with Mesh agent runtime process handling.
+- Added clearer scan failure diagnostics for PowerShell spawn failures and zero-output runs.
+
 ## 0.1.1
 
 - Fixed the meshcore PowerShell launch arguments so manual and scheduled scans return JSON correctly on Windows agents.
