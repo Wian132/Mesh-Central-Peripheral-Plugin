@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9
+
+- Added extra bottom padding to the device page so the lower tables are easier to reach inside MeshCentral.
+- Fixed uptime boot-time parsing for Windows DMTF-style timestamps so `Booted` no longer shows `Invalid Date`.
+- Added a regression test for Windows boot-time normalization.
+
 ## 0.1.8
 
 - Fixed a MeshCentral startup-order bug where the plugin could cache a null `webserver` reference and crash the server when opening device pages.

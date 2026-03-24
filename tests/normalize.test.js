@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 
 const { cloneDefaultConfig } = require("../lib/config");
 const { compileRules } = require("../lib/matching");
-const { normalizeFullPayload, normalizeStatusPayload } = require("../lib/normalize");
+const { normalizeDateTime, normalizeFullPayload, normalizeStatusPayload } = require("../lib/normalize");
 const { parseJsonCommandOutput } = require("../lib/parsers");
 
 function readFixture(name) {
@@ -52,4 +52,11 @@ test("command-output parser converts single objects to arrays", () => {
     const parsed = parseJsonCommandOutput("{\"Name\":\"Single Printer\"}", "printers");
     assert.equal(parsed.length, 1);
     assert.equal(parsed[0].Name, "Single Printer");
+});
+
+test("Windows DMTF timestamps normalize to ISO strings", () => {
+    assert.equal(
+        normalizeDateTime("20260324062234.500000+000"),
+        "2026-03-24T06:22:34.500Z"
+    );
 });
