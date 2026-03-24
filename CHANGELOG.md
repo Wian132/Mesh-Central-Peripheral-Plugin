@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Adjusted the meshcore PowerShell argument list to explicit tokens while keeping the temp-file/stdin execution pattern.
+- This avoids the meshcore startup error `number required, found undefined (stack index 1)` seen on the live agent.
+
 ## 0.1.3
 
 - Replaced the meshcore collector `-EncodedCommand` launch with a temp `.ps1` plus temp JSON file pattern that better matches known-working MeshCentral agent plugin execution.

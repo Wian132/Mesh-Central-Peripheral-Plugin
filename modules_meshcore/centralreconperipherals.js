@@ -8,20 +8,15 @@ function getPowerShellPath() {
     return winDir + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
 }
 
-function getPowerShellArgs(scriptPath) {
-    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
-}
-
-function getWorkingDirectory() {
-    return process.cwd();
+function getPowerShellArgs() {
+    return ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass"];
 }
 
 function buildScanPaths() {
     var rand = Math.random().toString(32).replace("0.", "");
-    var path = getWorkingDirectory();
     return {
-        scriptPath: path + "\\crp-" + rand + ".ps1",
-        outputPath: path + "\\crp-" + rand + ".json"
+        scriptPath: "crp-" + rand + ".ps1",
+        outputPath: "crp-" + rand + ".json"
     };
 }
 
@@ -128,6 +123,10 @@ function buildPowerShellScript(mode, outputPath) {
     return lines.join("\r\n");
 }
 
+function buildExecutionCommand(paths) {
+    return ".\\" + paths.scriptPath + "\r\n";
+}
+
 function runScan(args) {
     if (process.platform !== "win32") {
         sendResult(args, "unsupported", null, "Unsupported platform: " + process.platform, []);
@@ -148,7 +147,7 @@ function runScan(args) {
 
     try {
         fs.writeFileSync(paths.scriptPath, buildPowerShellScript(args.mode, paths.outputPath) + "\r\n", "utf8");
-        child = require("child_process").execFile(getPowerShellPath(), getPowerShellArgs(paths.scriptPath), {});
+        child = require("child_process").execFile(getPowerShellPath(), getPowerShellArgs());
     } catch (error) {
         cleanupFiles(paths);
         sendResult(args, "error", null, "Unable to start PowerShell scan: " + (error && error.message ? error.message : String(error)), []);
@@ -173,6 +172,19 @@ function runScan(args) {
     child.stderr.on("data", function (chunk) {
         stderr += chunk.toString();
     });
+    try {
+        child.stdin.write(buildExecutionCommand(paths));
+        child.stdin.write("exit\r\n");
+    } catch (error) {
+        if (!completed) {
+            completed = true;
+            clearTimeout(timeout);
+            activeScan = null;
+            cleanupFiles(paths);
+            sendResult(args, "error", null, "Unable to send scan command to PowerShell: " + (error && error.message ? error.message : String(error)), []);
+        }
+        return;
+    }
     child.on("error", function (error) {
         if (completed) { return; }
         completed = true;
@@ -224,9 +236,9 @@ function consoleaction(args, rights, sessionid, parent) {
 }
 
 module.exports = {
+    buildExecutionCommand: buildExecutionCommand,
     consoleaction: consoleaction,
     buildScanPaths: buildScanPaths,
     getPowerShellArgs: getPowerShellArgs,
-    getPowerShellPath: getPowerShellPath,
-    getWorkingDirectory: getWorkingDirectory
+    getPowerShellPath: getPowerShellPath
 };

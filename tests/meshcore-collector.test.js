@@ -2,17 +2,16 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const path = require("node:path");
 
-test("meshcore collector launches PowerShell against a script file in the working directory", () => {
+test("meshcore collector mirrors the known-working PowerShell launch shape", () => {
     const collector = require("../modules_meshcore/centralreconperipherals");
-    const args = collector.getPowerShellArgs("C:\\temp\\scan.ps1");
+    const args = collector.getPowerShellArgs();
     const paths = collector.buildScanPaths();
+    const command = collector.buildExecutionCommand(paths);
 
-    assert.deepEqual(args, ["-NoProfile", "-NoLogo", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:\\temp\\scan.ps1"]);
+    assert.deepEqual(args, ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass"]);
     assert.equal(args.includes("powershell"), false);
-    assert.equal(path.dirname(paths.scriptPath), collector.getWorkingDirectory());
-    assert.equal(path.dirname(paths.outputPath), collector.getWorkingDirectory());
-    assert.match(path.basename(paths.scriptPath), /^crp-[a-z0-9]+\.ps1$/);
-    assert.match(path.basename(paths.outputPath), /^crp-[a-z0-9]+\.json$/);
+    assert.match(paths.scriptPath, /^crp-[a-z0-9]+\.ps1$/);
+    assert.match(paths.outputPath, /^crp-[a-z0-9]+\.json$/);
+    assert.equal(command, ".\\" + paths.scriptPath + "\r\n");
 });
