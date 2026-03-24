@@ -6,6 +6,7 @@ The plugin focuses on:
 - printer status and presence
 - meaningful peripheral inventory for POS/server endpoints
 - payment-terminal candidate tagging through configurable heuristics
+- CPU, RAM, storage, uptime, and basic network telemetry for Windows devices
 - snapshot hashing, diffing, and change events
 - cautious rollout through explicit test groups and optional scheduled scans
 
@@ -45,6 +46,10 @@ Full scans:
 - `Get-PnpDevice`
 - `Get-CimInstance Win32_PnPEntity`
 - `Get-CimInstance Win32_SerialPort`
+- `Get-CimInstance Win32_Processor`
+- `Get-CimInstance Win32_OperatingSystem`
+- `Get-CimInstance Win32_LogicalDisk`
+- network adapter, gateway, and internet connectivity probes using read-only commands
 
 Normalized printer fields:
 - `name`
@@ -68,6 +73,13 @@ Normalized peripheral fields:
 - `sourceMethods`
 
 The UI emphasizes meaningful peripherals while the server still stores the fuller raw full-scan payload for diagnostics.
+
+System summary fields:
+- CPU model, usage, cores, logical processors, and max clock speed
+- RAM total, free, used, and used percent
+- OS caption/version and boot time
+- system drive used/free space
+- network state, link type, IP, Wi-Fi SSID/signal, gateway ping, and internet ping
 
 ## Installation
 
@@ -128,6 +140,13 @@ Key settings:
 - `logging.changeEvents`
 - `matching.printers[]`
 - `matching.paymentTerminals[]`
+- `integrations.famousRecon.enabled`
+- `integrations.famousRecon.endpointUrl`
+- `integrations.famousRecon.apiKey`
+- `integrations.famousRecon.deviceType`
+- `integrations.famousRecon.exportOnStatusScans`
+- `integrations.famousRecon.exportOnFullScans`
+- `integrations.famousRecon.requestTimeoutMs`
 
 Recommended v1 rollout config:
 - keep scheduled scans disabled until a test group is selected
@@ -136,6 +155,13 @@ Recommended v1 rollout config:
 - leave full interval at `15`
 - leave `advancedOneMinuteFullInventory` off
 - keep `maxConcurrentScans` at `3`
+
+Optional CentralRecon dashboard export:
+- leave `integrations.famousRecon.enabled` off until the FamousRecon API route and Supabase migration are deployed
+- set `integrations.famousRecon.endpointUrl` to your CentralRecon web app route, for example `https://app.centralrecon.com/api/fleet/mesh-plugin-telemetry`
+- use a FamousRecon fleet organization deployment key for `integrations.famousRecon.apiKey`
+- set `integrations.famousRecon.deviceType` to `pos` or `other` for this rollout lane
+- keep server devices on the existing server telemetry lane rather than exporting them through this plugin
 
 ## Testing
 

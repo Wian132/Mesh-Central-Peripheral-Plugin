@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11
+
+- Fixed device-page timestamp rendering so `Last Full Scan` and `Next Due` stay human-readable when MeshCentral stores scan times as epoch milliseconds.
+- Added Windows storage and network summary collection alongside CPU, RAM, OS, and uptime telemetry.
+- Added optional FamousRecon export settings in the plugin admin panel so POS and Other device telemetry can be forwarded into the CentralRecon dashboard pipeline.
+- Added automated coverage for the FamousRecon payload builder and the new system-summary normalization paths.
+
 ## 0.1.10
 
 - Fixed a client-side script escaping regression that could leave the device page shell visible but the content area blank.

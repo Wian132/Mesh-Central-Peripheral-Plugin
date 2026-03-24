@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 
 const { cloneDefaultConfig } = require("../lib/config");
 const { compileRules } = require("../lib/matching");
-const { normalizeDateTime, normalizeFullPayload, normalizeStatusPayload } = require("../lib/normalize");
+const { normalizeDateTime, normalizeFullPayload, normalizeStatusPayload, normalizeSystemSummary } = require("../lib/normalize");
 const { parseJsonCommandOutput } = require("../lib/parsers");
 
 function readFixture(name) {
@@ -59,4 +59,49 @@ test("Windows DMTF timestamps normalize to ISO strings", () => {
         normalizeDateTime("20260324062234.500000+000"),
         "2026-03-24T06:22:34.500Z"
     );
+});
+
+test("system normalization captures storage and network summary when present", () => {
+    const summary = normalizeSystemSummary({
+        cpu: [
+            {
+                Name: "Intel(R) Celeron(R) CPU J1900 @ 1.99GHz",
+                NumberOfCores: 4,
+                NumberOfLogicalProcessors: 4,
+                MaxClockSpeed: 1990,
+                LoadPercentage: 52
+            }
+        ],
+        operatingSystem: [
+            {
+                Caption: "Microsoft Windows 10 Pro",
+                Version: "10.0.19045",
+                CSName: "DEBMAIN2",
+                LastBootUpTime: "20260324090032.000000+000",
+                TotalVisibleMemorySize: 4128768,
+                FreePhysicalMemory: 1441792
+            }
+        ],
+        storage: {
+            systemDrive: "C:",
+            systemDisk: {
+                DeviceID: "C:",
+                Size: 255980290048,
+                FreeSpace: 103079215104
+            }
+        },
+        network: {
+            state: "online",
+            linkType: "ethernet",
+            ipAddress: "192.168.1.50",
+            gatewayPingMs: 2.4,
+            internetPingMs: 14.8
+        }
+    });
+
+    assert.equal(summary.storage.systemDrive, "C:");
+    assert.equal(summary.storage.usedPercent, 60);
+    assert.equal(summary.network.state, "online");
+    assert.equal(summary.network.linkType, "ethernet");
+    assert.equal(summary.network.ipAddress, "192.168.1.50");
 });
