@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.15
+
+- Switched meshcore PowerShell execution from stdin piping to direct `-File` invocation, fixing scan timeouts on machines where the mesh agent's `child_process` stdin was not flushing reliably.
+- The plugin now runs `powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File crp-xxx.ps1` instead of starting an interactive PowerShell process and writing the script path to stdin.
+- This eliminates the dependency on stdin buffering behavior in the mesh agent runtime, which was causing indefinite hangs on STEMAIN2/STEMAIN3 while working fine on DEBMAIN1/DEBMAIN2.
+
 ## 0.1.14
 
 - Optimized the meshcore PowerShell collector for slow POS hardware that was timing out at 120 seconds.

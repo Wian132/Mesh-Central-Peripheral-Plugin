@@ -3,15 +3,17 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-test("meshcore collector mirrors the known-working PowerShell launch shape", () => {
+test("meshcore collector uses -File flag for direct script execution", () => {
     const collector = require("../modules_meshcore/centralreconperipherals");
     const args = collector.getPowerShellArgs();
     const paths = collector.buildScanPaths();
-    const command = collector.buildExecutionCommand(paths);
 
     assert.deepEqual(args, ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass"]);
     assert.equal(args.includes("powershell"), false);
     assert.match(paths.scriptPath, /^crp-[a-z0-9]+\.ps1$/);
     assert.match(paths.outputPath, /^crp-[a-z0-9]+\.json$/);
-    assert.equal(command, ".\\" + paths.scriptPath + "\r\n");
+
+    const fullArgs = args.concat(["-File", paths.scriptPath]);
+    assert.equal(fullArgs[fullArgs.length - 2], "-File");
+    assert.equal(fullArgs[fullArgs.length - 1], paths.scriptPath);
 });
