@@ -227,6 +227,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             scanHealth: state.lastError ? "warning" : "ok",
             lastStatusScanAt: state.lastStatusScanAt,
             lastFullScanAt: state.lastFullScanAt,
+            hasPreviousFullSnapshot: Boolean(state.previousFullSnapshot),
             statusHash: state.statusHash,
             changedSincePrevious: state.changedSincePrevious,
             runningMode: state.scheduler.runningMode,

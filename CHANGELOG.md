@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6
+
+- Improved the device tab to default to a more meaningful POS-focused view instead of a raw Windows inventory dump.
+- Added summary cards for physical printers, serial ports, scanners, and focused-device counts.
+- Tagged likely virtual/system printers and added a focused-vs-full inventory toggle.
+- Treated the first successful full scan as a baseline in the UI so the initial import reads more clearly.
+
 ## 0.1.5
 
 - Removed explicit `utf8` file-encoding arguments from the meshcore collector file I/O to avoid the live agent `unsupported encoding in method 'handleServerCommand()'` exception.
