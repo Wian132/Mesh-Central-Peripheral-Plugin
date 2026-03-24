@@ -3,6 +3,15 @@
 var mesh = null;
 var activeScan = null;
 
+function getPowerShellPath() {
+    var winDir = process.env["WINDIR"] || process.env["windir"] || "C:\\Windows";
+    return winDir + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+}
+
+function getPowerShellArgs() {
+    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-Command", "-"];
+}
+
 function sendResult(args, status, payload, error, warnings) {
     mesh.SendCommand({
         action: "plugin",
@@ -115,8 +124,8 @@ function runScan(args) {
     var stderr = "";
     var completed = false;
     var child = require("child_process").execFile(
-        process.env["windir"] + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-        ["powershell", "-NoProfile", "-NoLogo", "-Command", "-"],
+        getPowerShellPath(),
+        getPowerShellArgs(),
         {}
     );
 
@@ -146,7 +155,7 @@ function runScan(args) {
         activeScan = null;
 
         if (stdout.trim() === "") {
-            sendResult(args, "error", null, stderr.trim() || ("PowerShell exited with code " + code + "."), []);
+            sendResult(args, "error", null, stderr.trim() || ("PowerShell returned no JSON output (exit code " + code + ")."), []);
             return;
         }
 
@@ -173,5 +182,7 @@ function consoleaction(args, rights, sessionid, parent) {
 }
 
 module.exports = {
-    consoleaction: consoleaction
+    consoleaction: consoleaction,
+    getPowerShellArgs: getPowerShellArgs,
+    getPowerShellPath: getPowerShellPath
 };

@@ -1,6 +1,6 @@
 {
   "name": "meshcentral-centralreconperipherals",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CentralRecon MeshCentral plugin for Windows peripheral telemetry and inventory.",
   "main": "centralreconperipherals.js",
   "type": "commonjs",
