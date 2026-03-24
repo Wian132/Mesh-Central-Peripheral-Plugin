@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+- Replaced the meshcore collector `-EncodedCommand` launch with a temp `.ps1` plus temp JSON file pattern that better matches known-working MeshCentral agent plugin execution.
+- Avoided `Buffer` usage in the meshcore collector to stay compatible with the agent runtime.
+- Added a regression test for temp-file PowerShell execution setup.
+
 ## 0.1.2
 
 - Switched the meshcore collector from stdin-fed PowerShell commands to `-EncodedCommand` for better compatibility with Mesh agent runtime process handling.

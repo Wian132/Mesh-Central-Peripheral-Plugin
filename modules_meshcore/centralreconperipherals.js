@@ -8,12 +8,28 @@ function getPowerShellPath() {
     return winDir + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
 }
 
-function encodePowerShellCommand(script) {
-    return Buffer.from(String(script || ""), "utf16le").toString("base64");
+function getPowerShellArgs(scriptPath) {
+    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", scriptPath];
 }
 
-function getPowerShellArgs(script) {
-    return ["-NoProfile", "-NoLogo", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodePowerShellCommand(script)];
+function getWorkingDirectory() {
+    return process.cwd();
+}
+
+function buildScanPaths() {
+    var rand = Math.random().toString(32).replace("0.", "");
+    var path = getWorkingDirectory();
+    return {
+        scriptPath: path + "\\crp-" + rand + ".ps1",
+        outputPath: path + "\\crp-" + rand + ".json"
+    };
+}
+
+function cleanupFiles(paths) {
+    var fs = require("fs");
+    if (!paths) { return; }
+    try { fs.unlinkSync(paths.scriptPath); } catch (ex) { }
+    try { fs.unlinkSync(paths.outputPath); } catch (ex) { }
 }
 
 function sendResult(args, status, payload, error, warnings) {
@@ -31,7 +47,7 @@ function sendResult(args, status, payload, error, warnings) {
     });
 }
 
-function buildPowerShellScript(mode) {
+function buildPowerShellScript(mode, outputPath) {
     var statusOnly = (mode === "status");
     var lines = [
         "$ErrorActionPreference = 'Stop'",
@@ -108,7 +124,7 @@ function buildPowerShellScript(mode) {
     }
 
     lines.push("$result.warnings = @($warnings)");
-    lines.push("$result | ConvertTo-Json -Depth 8 -Compress");
+    lines.push("$result | ConvertTo-Json -Depth 8 -Compress | Set-Content -Path '" + String(outputPath).replace(/'/g, "''") + "' -Encoding UTF8");
     return lines.join("\r\n");
 }
 
@@ -124,19 +140,25 @@ function runScan(args) {
     }
 
     var timeoutMs = Number(args.timeoutMs) || 45000;
-    var stdout = "";
+    var fs = require("fs");
     var stderr = "";
     var completed = false;
-    var script = buildPowerShellScript(args.mode) + "\r\nexit\r\n";
-    var child = require("child_process").execFile(
-        getPowerShellPath(),
-        getPowerShellArgs(script),
-        {}
-    );
+    var paths = buildScanPaths();
+    var child = null;
+
+    try {
+        fs.writeFileSync(paths.scriptPath, buildPowerShellScript(args.mode, paths.outputPath) + "\r\n", "utf8");
+        child = require("child_process").execFile(getPowerShellPath(), getPowerShellArgs(paths.scriptPath), {});
+    } catch (error) {
+        cleanupFiles(paths);
+        sendResult(args, "error", null, "Unable to start PowerShell scan: " + (error && error.message ? error.message : String(error)), []);
+        return;
+    }
 
     activeScan = {
         requestId: args.requestId,
-        child: child
+        child: child,
+        paths: paths
     };
 
     var timeout = setTimeout(function () {
@@ -144,12 +166,10 @@ function runScan(args) {
         completed = true;
         try { child.kill(); } catch (ex) { }
         activeScan = null;
+        cleanupFiles(paths);
         sendResult(args, "error", null, "PowerShell scan timed out after " + timeoutMs + "ms.", []);
     }, timeoutMs);
 
-    child.stdout.on("data", function (chunk) {
-        stdout += chunk.toString();
-    });
     child.stderr.on("data", function (chunk) {
         stderr += chunk.toString();
     });
@@ -158,6 +178,7 @@ function runScan(args) {
         completed = true;
         clearTimeout(timeout);
         activeScan = null;
+        cleanupFiles(paths);
         sendResult(args, "error", null, "Unable to start PowerShell: " + (error && error.message ? error.message : String(error)), []);
     });
     child.on("exit", function (code) {
@@ -166,25 +187,31 @@ function runScan(args) {
         clearTimeout(timeout);
         activeScan = null;
 
-        if (stdout.trim() === "") {
+        var output = "";
+        try {
+            output = fs.readFileSync(paths.outputPath, "utf8").toString().trim();
+        } catch (error) { }
+        cleanupFiles(paths);
+
+        if (output === "") {
             sendResult(
                 args,
                 "error",
                 null,
-                stderr.trim() || ("PowerShell returned no JSON output (exit code " + code + ", stdout bytes " + stdout.length + ", stderr bytes " + stderr.length + ")."),
+                stderr.trim() || ("PowerShell returned no JSON file output (exit code " + code + ")."),
                 []
             );
             return;
         }
 
         try {
-            var payload = JSON.parse(stdout.trim());
+            var payload = JSON.parse(output);
             var warnings = Array.isArray(payload.warnings) ? payload.warnings.slice() : [];
             if (stderr.trim() !== "") { warnings.push(stderr.trim()); }
             delete payload.warnings;
             sendResult(args, warnings.length > 0 ? "partial" : "ok", payload, null, warnings);
         } catch (error) {
-            sendResult(args, "error", null, "Unable to parse PowerShell JSON output: " + error.message, stderr.trim() ? [stderr.trim()] : []);
+            sendResult(args, "error", null, "Unable to parse PowerShell JSON file output: " + error.message, stderr.trim() ? [stderr.trim()] : []);
         }
     });
 
@@ -198,7 +225,8 @@ function consoleaction(args, rights, sessionid, parent) {
 
 module.exports = {
     consoleaction: consoleaction,
-    encodePowerShellCommand: encodePowerShellCommand,
+    buildScanPaths: buildScanPaths,
     getPowerShellArgs: getPowerShellArgs,
-    getPowerShellPath: getPowerShellPath
+    getPowerShellPath: getPowerShellPath,
+    getWorkingDirectory: getWorkingDirectory
 };
