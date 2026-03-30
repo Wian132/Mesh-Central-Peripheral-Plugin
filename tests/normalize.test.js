@@ -7,7 +7,15 @@ const assert = require("node:assert/strict");
 
 const { cloneDefaultConfig } = require("../lib/config");
 const { compileRules } = require("../lib/matching");
-const { normalizeDateTime, normalizeFullPayload, normalizeStatusPayload, normalizeSystemSummary } = require("../lib/normalize");
+const {
+    mergeHealthSignals,
+    normalizeDateTime,
+    normalizeFullPayload,
+    normalizeHealthSignals,
+    normalizeOfficeActivation,
+    normalizeStatusPayload,
+    normalizeSystemSummary
+} = require("../lib/normalize");
 const { parseJsonCommandOutput } = require("../lib/parsers");
 
 function readFixture(name) {
@@ -104,4 +112,99 @@ test("system normalization captures storage and network summary when present", (
     assert.equal(summary.network.state, "online");
     assert.equal(summary.network.linkType, "ethernet");
     assert.equal(summary.network.ipAddress, "192.168.1.50");
+});
+
+test("office normalization maps OSPP statuses into shared admin health values", () => {
+    const licensed = normalizeOfficeActivation({
+        method: "ospp-vbs",
+        rawOutput: readFixture("ospp-dstatus-licensed.txt")
+    });
+    const unlicensed = normalizeOfficeActivation({
+        method: "ospp-vbs",
+        rawOutput: readFixture("ospp-dstatus-unlicensed.txt")
+    });
+    const notification = normalizeOfficeActivation({
+        method: "ospp-vbs",
+        rawOutput: readFixture("ospp-dstatus-notification.txt")
+    });
+    const unknown = normalizeOfficeActivation({
+        method: "none",
+        rawOutput: readFixture("office-probe-none.txt")
+    });
+
+    assert.equal(licensed.officeActivationStatus, "licensed");
+    assert.equal(licensed.officeProductName, "Office 16, Office16ProPlusVL_KMS_Client edition");
+    assert.equal(unlicensed.officeActivationStatus, "unlicensed");
+    assert.equal(notification.officeActivationStatus, "notification");
+    assert.equal(unknown.officeActivationStatus, "unknown");
+    assert.equal(unknown.officeProductName, null);
+});
+
+test("health signal normalization parses vnext output and preserves generic signals", () => {
+    const signals = normalizeHealthSignals({
+        pendingReboot: true,
+        office: {
+            method: "vnextdiag",
+            rawOutput: readFixture("vnextdiag-licensed.txt")
+        },
+        unexpectedShutdownCount7d: 0,
+        disk: {
+            method: "Get-PhysicalDisk",
+            items: [
+                {
+                    FriendlyName: "Disk 0",
+                    HealthStatus: "Healthy",
+                    OperationalStatus: "OK"
+                }
+            ]
+        }
+    });
+
+    assert.deepEqual(signals, {
+        pendingReboot: true,
+        officeActivationStatus: "licensed",
+        officeProductName: "Microsoft 365 Apps for enterprise",
+        unexpectedShutdownCount7d: 0,
+        diskHealthStatus: "healthy"
+    });
+});
+
+test("health signal merge prefers cached full data with the latest pending reboot value", () => {
+    const merged = mergeHealthSignals(
+        {
+            healthSignals: {
+                pendingReboot: false
+            }
+        },
+        {
+            healthSignals: {
+                pendingReboot: true,
+                officeActivationStatus: "licensed",
+                officeProductName: "Microsoft 365 Apps for enterprise",
+                unexpectedShutdownCount7d: 1,
+                diskHealthStatus: "warning"
+            }
+        }
+    );
+
+    assert.deepEqual(merged, {
+        pendingReboot: false,
+        officeActivationStatus: "licensed",
+        officeProductName: "Microsoft 365 Apps for enterprise",
+        unexpectedShutdownCount7d: 1,
+        diskHealthStatus: "warning"
+    });
+});
+
+test("full normalization includes normalized health signals from collector payload", () => {
+    const payload = JSON.parse(readFixture("health-full-payload.json"));
+    const snapshot = normalizeFullPayload(payload, buildCompiledMatching());
+
+    assert.deepEqual(snapshot.healthSignals, {
+        pendingReboot: true,
+        officeActivationStatus: "licensed",
+        officeProductName: "Microsoft 365 Apps for enterprise",
+        unexpectedShutdownCount7d: 0,
+        diskHealthStatus: "healthy"
+    });
 });

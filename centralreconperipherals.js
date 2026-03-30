@@ -11,7 +11,7 @@ const {
 const { buildFullDiff } = require("./lib/diff");
 const { createHashHex } = require("./lib/hash");
 const { compileRules } = require("./lib/matching");
-const { normalizeFullPayload, normalizeStatusPayload } = require("./lib/normalize");
+const { mergeHealthSignals, normalizeFullPayload, normalizeStatusPayload } = require("./lib/normalize");
 const { Persistence } = require("./lib/persistence");
 const {
     applyCompletionSchedule,
@@ -253,6 +253,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const systemSummary = (state.lastStatusScanAt || 0) >= (state.lastFullScanAt || 0)
             ? (statusSystemSummary || fullSystemSummary)
             : (fullSystemSummary || statusSystemSummary);
+        const healthSignals = mergeHealthSignals(state.statusSnapshot, state.fullSnapshot);
 
         return {
             nodeId: state.nodeId,
@@ -270,6 +271,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             nextFullScanAt,
             nextDueAt,
             systemSummary,
+            healthSignals,
             printers,
             peripherals: state.fullSnapshot ? state.fullSnapshot.peripherals : [],
             paymentTerminalCandidates,

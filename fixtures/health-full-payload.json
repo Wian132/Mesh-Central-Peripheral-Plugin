@@ -1,0 +1,45 @@
+{
+  "printers": {
+    "method": "Get-Printer",
+    "items": []
+  },
+  "pnpDevices": {
+    "method": "Get-PnpDevice",
+    "items": []
+  },
+  "serialPorts": {
+    "method": "Win32_SerialPort",
+    "items": []
+  },
+  "system": {
+    "operatingSystem": [
+      {
+        "Caption": "Microsoft Windows 11 Pro",
+        "Version": "10.0.22631",
+        "CSName": "ADMIN1",
+        "LastBootUpTime": "2026-03-29T08:00:00.000Z",
+        "TotalVisibleMemorySize": 16777216,
+        "FreePhysicalMemory": 8388608
+      }
+    ]
+  },
+  "healthSignals": {
+    "pendingReboot": true,
+    "office": {
+      "method": "vnextdiag",
+      "rawOutput": "Name: Microsoft Visio LTSC Professional 2021\r\nLicenseState: Licensed\r\n\r\nName: Microsoft 365 Apps for enterprise\r\nLicenseState: Licensed\r\n"
+    },
+    "unexpectedShutdownCount7d": 0,
+    "disk": {
+      "method": "Get-PhysicalDisk",
+      "items": [
+        {
+          "FriendlyName": "Disk 0",
+          "HealthStatus": "Healthy",
+          "OperationalStatus": "OK"
+        }
+      ]
+    }
+  },
+  "warnings": []
+}

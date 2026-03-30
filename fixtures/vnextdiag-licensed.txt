@@ -1,0 +1,5 @@
+Name: Microsoft Visio LTSC Professional 2021
+LicenseState: Licensed
+
+Name: Microsoft 365 Apps for enterprise
+LicenseState: Licensed

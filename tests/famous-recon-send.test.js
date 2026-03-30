@@ -70,6 +70,43 @@ test("sendTelemetry returns status and body on HTTP error", async (t) => {
     assert.match(String(result.error), /invalid collector/);
 });
 
+test("sendTelemetry retries once without healthSignals when an older endpoint rejects that field", async (t) => {
+    const requests = [];
+    t.mock.method(global, "fetch", async (url, options) => {
+        requests.push(JSON.parse(options.body));
+        if (requests.length === 1) {
+            return {
+                ok: false,
+                status: 400,
+                text: async () => '{"error":"Validation failed","details":{"healthSignals":["Unknown field"]}}'
+            };
+        }
+        return {
+            ok: true,
+            status: 204,
+            text: async () => ""
+        };
+    });
+
+    const result = await sendTelemetry(
+        { enabled: true, endpointUrl: "https://example.com/hook", apiKey: "fk_1234567890abcdef", requestTimeoutMs: 5000 },
+        {
+            nodeId: "node//x",
+            deviceId: "ADMIN1",
+            deviceType: "admin",
+            healthSignals: {
+                officeActivationStatus: "licensed"
+            },
+            metrics: {}
+        }
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests[0].healthSignals, { officeActivationStatus: "licensed" });
+    assert.equal(Object.prototype.hasOwnProperty.call(requests[1], "healthSignals"), false);
+});
+
 // --- buildSupabaseRow tests ---
 
 test("buildSupabaseRow maps payload fields to DB column names", () => {
@@ -96,6 +133,13 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
             gatewayPingMs: 2.4,
             internetPingMs: 14.8
         },
+        healthSignals: {
+            pendingReboot: true,
+            officeActivationStatus: "notification",
+            officeProductName: "Microsoft 365 Apps for enterprise",
+            unexpectedShutdownCount7d: 2,
+            diskHealthStatus: "warning"
+        },
         printers: [{ name: "Receipt", status: "idle" }],
         peripherals: [{ name: "COM1", class: "Ports" }],
         paymentTerminalCandidates: [{ name: "Verifone VX820" }]
@@ -121,6 +165,11 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
     assert.deepEqual(row.payment_terminal_candidates, [{ name: "Verifone VX820" }]);
     assert.equal(row.peripherals_hash, "abc123");
     assert.equal(row.peripherals_changed, true);
+    assert.equal(row.pending_reboot, true);
+    assert.equal(row.office_activation_status, "notification");
+    assert.equal(row.office_product_name, "Microsoft 365 Apps for enterprise");
+    assert.equal(row.unexpected_shutdown_count_7d, 2);
+    assert.equal(row.disk_health_status, "warning");
     assert.equal(row.telemetry_source, "agent");
     assert.equal(row.collector_kind, "meshcentral_plugin");
     assert.equal(row.agent_version, "0.1.13");
@@ -216,6 +265,55 @@ test("sendTelemetryToSupabase happy path resolves + inserts", async () => {
         assert.equal(calls.length, 2);
         assert.equal(calls[0].method, "GET");
         assert.equal(calls[1].method, "POST");
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("sendTelemetryToSupabase retries without unsupported plugin health columns", async () => {
+    const originalFetch = global.fetch;
+    const posts = [];
+    global.fetch = async (url, opts) => {
+        if (opts.method === "GET") {
+            return { ok: true, json: async () => [{ id: "srv-uuid" }] };
+        }
+
+        posts.push(JSON.parse(opts.body));
+        if (posts.length === 1) {
+            return {
+                ok: false,
+                status: 400,
+                text: async () => "Could not find the 'office_activation_status' column of 'server_telemetry' in the schema cache"
+            };
+        }
+
+        return { ok: true, status: 201, text: async () => "" };
+    };
+
+    try {
+        const result = await sendTelemetryToSupabase(
+            { enabled: true, supabaseUrl: "https://proj.supabase.co", supabaseAnonKey: "anon-key", requestTimeoutMs: 5000 },
+            {
+                nodeId: "node//test/dev1",
+                reportedAt: "2026-03-24T12:00:00Z",
+                metrics: {},
+                healthSignals: {
+                    pendingReboot: true,
+                    officeActivationStatus: "licensed",
+                    officeProductName: "Microsoft 365 Apps for enterprise",
+                    unexpectedShutdownCount7d: 1,
+                    diskHealthStatus: "healthy"
+                },
+                printers: [],
+                peripherals: [],
+                paymentTerminalCandidates: []
+            }
+        );
+
+        assert.equal(result.ok, true);
+        assert.equal(posts.length, 2);
+        assert.equal(posts[0].office_activation_status, "licensed");
+        assert.equal(posts[1].office_activation_status, undefined);
     } finally {
         global.fetch = originalFetch;
     }

@@ -12,6 +12,7 @@
  *   set TEST_MESH_NODE_ID=node//...   (defaults to first fleet_server found)
  */
 
+const test = require("node:test");
 const { buildSupabaseRow, resolveServerId, sendTelemetryToSupabase } = require("../lib/famous-recon");
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
@@ -20,8 +21,7 @@ const TEST_MESH_NODE_ID = (process.env.TEST_MESH_NODE_ID || "").trim();
 const TIMEOUT_MS = 15000;
 
 function fail(message) {
-    console.error("FAIL:", message);
-    process.exit(1);
+    throw new Error(message);
 }
 
 function ok(message) {
@@ -205,6 +205,11 @@ async function run() {
     }
 }
 
-run().catch((error) => {
-    fail("Unhandled error: " + (error && error.message ? error.message : String(error)));
+test("direct supabase insert remains opt-in and credentialed", { timeout: 120000 }, async (t) => {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        t.skip("Set SUPABASE_URL and SUPABASE_ANON_KEY to run the Supabase E2E test.");
+        return;
+    }
+
+    await run();
 });

@@ -1,0 +1,1 @@
+No Office activation tooling was detected on this machine.

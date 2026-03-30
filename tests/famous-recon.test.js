@@ -95,4 +95,73 @@ test("telemetry payload converts system summary and inventory into Famous Recon 
     assert.equal(payload.printers[0].port_name, "COM1:");
     assert.equal(payload.peripherals[0].id, "ACPI\\PNP0501\\0");
     assert.equal(payload.paymentTerminalCandidates.length, 1);
+    assert.equal(payload.healthSignals, undefined);
+});
+
+test("telemetry payload includes health signals for admin exports", () => {
+    const payload = buildTelemetryPayload({
+        nodeId: "node//sample/admin1",
+        systemSummary: {
+            operatingSystem: {
+                computerName: "ADMIN1"
+            }
+        },
+        healthSignals: {
+            pendingReboot: true,
+            officeActivationStatus: "licensed",
+            officeProductName: "Microsoft 365 Apps for enterprise",
+            unexpectedShutdownCount7d: 0,
+            diskHealthStatus: "healthy"
+        },
+        printers: [],
+        peripherals: [],
+        paymentTerminalCandidates: []
+    }, {
+        scanMode: "full",
+        pluginVersion: "0.1.16",
+        deviceId: "ADMIN1",
+        deviceType: "admin",
+        inventoryChanged: false
+    });
+
+    assert.deepEqual(payload.healthSignals, {
+        pendingReboot: true,
+        officeActivationStatus: "licensed",
+        officeProductName: "Microsoft 365 Apps for enterprise",
+        unexpectedShutdownCount7d: 0,
+        diskHealthStatus: "healthy"
+    });
+});
+
+test("telemetry payload omits admin-only office fields for non-admin exports", () => {
+    const payload = buildTelemetryPayload({
+        nodeId: "node//sample/pos1",
+        systemSummary: {
+            operatingSystem: {
+                computerName: "POS1"
+            }
+        },
+        healthSignals: {
+            pendingReboot: false,
+            officeActivationStatus: "licensed",
+            officeProductName: "Microsoft 365 Apps for enterprise",
+            unexpectedShutdownCount7d: 2,
+            diskHealthStatus: "warning"
+        },
+        printers: [],
+        peripherals: [],
+        paymentTerminalCandidates: []
+    }, {
+        scanMode: "status",
+        pluginVersion: "0.1.16",
+        deviceId: "POS1",
+        deviceType: "pos",
+        inventoryChanged: false
+    });
+
+    assert.deepEqual(payload.healthSignals, {
+        pendingReboot: false,
+        unexpectedShutdownCount7d: 2,
+        diskHealthStatus: "warning"
+    });
 });

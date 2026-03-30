@@ -1,0 +1,9 @@
+---Processing--------------------------
+---------------------------------------
+PRODUCT ID: 00339-10000-00000-AA123
+SKU ID: 11111111-2222-3333-4444-555555555555
+LICENSE NAME: Office 16, Office16StandardVL_MAK edition
+LICENSE DESCRIPTION: Office 16, VOLUME_MAK channel
+LICENSE STATUS:  ---UNLICENSED---
+ERROR CODE: 0xC004F014
+ERROR DESCRIPTION: The Software Licensing Service reported that the product key is not available.

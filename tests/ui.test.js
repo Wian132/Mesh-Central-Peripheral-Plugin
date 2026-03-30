@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { renderDevicePage } = require("../lib/ui");
+const { renderAdminPage, renderDevicePage } = require("../lib/ui");
 
 test("device page emits a syntactically valid browser script", () => {
     const html = renderDevicePage({
@@ -20,4 +20,15 @@ test("device page emits a syntactically valid browser script", () => {
         // Validate syntax only; this doesn't execute the page logic.
         new Function(match[1]);
     });
+});
+
+test("admin page renders admin as a valid Famous Recon device type option", () => {
+    const html = renderAdminPage({
+        title: "CentralRecon Peripherals Settings",
+        apiBase: "/pluginadmin.ashx?pin=centralreconperipherals"
+    });
+
+    assert.match(html, /<option value="admin"/);
+    assert.match(html, />Admin<\/option>/);
+    assert.match(html, /deviceType:\s*form\.famousReconDeviceType\.value\.trim\(\)/);
 });

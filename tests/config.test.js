@@ -57,3 +57,16 @@ test("invalid regex rules are rejected", () => {
 
     assert.ok(result.errors.some((error) => error.includes("nameRegex")));
 });
+
+test("famous recon device type accepts admin", () => {
+    const result = sanitizeConfig({
+        integrations: {
+            famousRecon: {
+                deviceType: "admin"
+            }
+        }
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.config.integrations.famousRecon.deviceType, "admin");
+});

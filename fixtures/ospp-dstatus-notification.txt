@@ -1,0 +1,8 @@
+---Processing--------------------------
+---------------------------------------
+PRODUCT ID: 00339-10000-00000-AA123
+SKU ID: 11111111-2222-3333-4444-555555555555
+LICENSE NAME: Office 16, Office16MondoR_Grace edition
+LICENSE DESCRIPTION: Office 16, RETAIL(Grace) channel
+LICENSE STATUS:  ---OOB_GRACE---
+ERROR DESCRIPTION: Remaining grace: 4 days

@@ -4,9 +4,10 @@ CentralRecon Peripherals is a stock-MeshCentral plugin for Windows peripheral te
 
 The plugin focuses on:
 - printer status and presence
-- meaningful peripheral inventory for POS/server endpoints
+- meaningful peripheral inventory for Admin/POS/server endpoints
 - payment-terminal candidate tagging through configurable heuristics
 - CPU, RAM, storage, uptime, and basic network telemetry for Windows devices
+- pending reboot and best-effort Windows health signals for FamousRecon export
 - snapshot hashing, diffing, and change events
 - cautious rollout through explicit test groups and optional scheduled scans
 
@@ -40,6 +41,7 @@ Advanced mode allows 1-minute full inventory, but it is not the default.
 Status scans:
 - `Get-Printer` with CIM fallback
 - `Get-PnpDevice -PresentOnly`
+- pending reboot detection from read-only Windows reboot indicators
 
 Full scans:
 - `Get-Printer`
@@ -49,6 +51,10 @@ Full scans:
 - `Get-CimInstance Win32_Processor`
 - `Get-CimInstance Win32_OperatingSystem`
 - `Get-CimInstance Win32_LogicalDisk`
+- `OSPP.VBS /dstatus` when available for Office activation
+- `vnextdiag.ps1 -action list` as a fallback for Microsoft 365 Apps activation
+- `Get-WinEvent` for unexpected shutdown count over the last 7 days
+- `Get-PhysicalDisk` for best-effort disk health
 - network adapter, gateway, and internet connectivity probes using read-only commands
 
 Normalized printer fields:
@@ -80,6 +86,18 @@ System summary fields:
 - OS caption/version and boot time
 - system drive used/free space
 - network state, link type, IP, Wi-Fi SSID/signal, gateway ping, and internet ping
+
+Health signal fields exported to FamousRecon when available:
+- `pendingReboot`
+- `officeActivationStatus`
+- `officeProductName`
+- `unexpectedShutdownCount7d`
+- `diskHealthStatus`
+
+Office activation notes:
+- Office activation is normalized in JS on the plugin server from raw collector output.
+- Admin exports prefer `OSPP.VBS /dstatus` first and fall back to `vnextdiag.ps1 -action list` when OSPP is unavailable or not applicable.
+- Expensive health signals are collected on full scans and merged into later status-scan exports from the last known full snapshot.
 
 ## Installation
 
@@ -160,8 +178,11 @@ Optional CentralRecon dashboard export:
 - leave `integrations.famousRecon.enabled` off until the FamousRecon API route and Supabase migration are deployed
 - set `integrations.famousRecon.endpointUrl` to your CentralRecon web app route, for example `https://app.centralrecon.com/api/fleet/mesh-plugin-telemetry`
 - use a FamousRecon fleet organization deployment key for `integrations.famousRecon.apiKey`
-- set `integrations.famousRecon.deviceType` to `pos` or `other` for this rollout lane
+- set `integrations.famousRecon.deviceType` to `admin`, `pos`, or `other` for this rollout lane
+- Office activation fields are only populated when the plugin's FamousRecon device type override is `admin`
 - keep server devices on the existing server telemetry lane rather than exporting them through this plugin
+- legacy HTTP export retries once without `healthSignals` if an older endpoint rejects that field
+- direct Supabase export retries once without unsupported plugin/health columns if the target schema has not been migrated yet
 
 Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
 
@@ -170,14 +191,19 @@ Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug 
 Automated tests:
 
 ```bash
-node --test tests/*.test.js
+npm test
 ```
 
-If `npm` works normally in your environment, `npm test` runs the same suite.
+Explicit Supabase E2E coverage remains opt-in:
+
+```bash
+npm run test:e2e:supabase
+```
 
 Automated coverage includes:
 - config validation
 - parser and normalizer behavior
+- Office activation normalization and merged health-signal behavior
 - status/full hash stability
 - diff detection
 - scheduler no-overlap/cooldown behavior
@@ -230,4 +256,6 @@ Optional VM-based validation remains allowed, but it is not required.
 - Payment-terminal detection is heuristic and should be treated as candidate matching until validated against real hardware.
 - Non-Windows devices return unsupported status instead of inventory data.
 - The plugin stores current and previous raw full snapshots, not an unlimited full-history archive.
+- Office activation is best-effort and depends on `OSPP.VBS` and/or `vnextdiag.ps1` being present on the endpoint.
+- Disk health and unexpected shutdown counts are best-effort full-scan signals and do not block exports if Windows cannot provide them.
 - Live POS workflow validation still depends on access to the actual POS application/peripherals.

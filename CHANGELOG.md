@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.17
+
+- Added `admin` as a valid FamousRecon device type override in config validation, admin UI, and test coverage.
+- Extended the FamousRecon payload contract with optional `healthSignals` and mapped the new fields into direct Supabase columns: `pending_reboot`, `office_activation_status`, `office_product_name`, `unexpected_shutdown_count_7d`, and `disk_health_status`.
+- Added read-only Windows health collection for pending reboot on every scan plus Office activation, unexpected shutdown count, and disk health on full scans.
+- Office activation now probes `OSPP.VBS /dstatus` first and falls back to `vnextdiag.ps1 -action list` for Microsoft 365 Apps when available.
+- Full-scan health signals are cached and merged into later status-scan exports so Admin Office activation survives lightweight status polling.
+- Legacy HTTP export now retries once without `healthSignals` when an older FamousRecon endpoint rejects that field.
+- Direct Supabase export now retries once without unsupported plugin/health columns when posting into an older schema.
+- Added fixture-driven tests for Office normalization, merged health-signal behavior, backward-compat retries, and the Admin device type path.
+- Gated the Supabase E2E test behind environment variables so `npm test` stays green by default while `npm run test:e2e:supabase` remains available for manual credentialed validation.
+
 ## 0.1.15
 
 - Switched meshcore PowerShell execution from stdin piping to direct `-File` invocation, fixing scan timeouts on machines where the mesh agent's `child_process` stdin was not flushing reliably.
