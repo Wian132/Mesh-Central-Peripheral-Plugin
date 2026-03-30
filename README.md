@@ -102,7 +102,7 @@ Health signal fields exported to FamousRecon when available:
 
 Office activation notes:
 - Office activation is normalized in JS on the plugin server from raw collector output.
-- Admin exports prefer `vnextdiag.ps1 -action list` when it exposes live license data, and fall back to `OSPP.VBS /dstatus` for older perpetual-style installs.
+- Office probes prefer `vnextdiag.ps1 -action list` when it exposes live license data, and fall back to `OSPP.VBS /dstatus` for older perpetual-style installs.
 - Expensive health signals are collected on full scans and merged into later status-scan exports from the last known full snapshot.
 
 ## Installation
@@ -184,8 +184,8 @@ Optional CentralRecon dashboard export:
 - leave `integrations.famousRecon.enabled` off until the FamousRecon API route and Supabase migration are deployed
 - set `integrations.famousRecon.endpointUrl` to your CentralRecon web app route, for example `https://app.centralrecon.com/api/fleet/mesh-plugin-telemetry`
 - use a FamousRecon fleet organization deployment key for `integrations.famousRecon.apiKey`
-- set `integrations.famousRecon.deviceType` to `admin`, `pos`, or `other` for this rollout lane
-- Office activation fields are only populated when the plugin's FamousRecon device type override is `admin`
+- set `integrations.famousRecon.deviceType` to `admin`, `pos`, or `other` only when you need to override the existing FamousRecon device type for a rollout lane
+- when that override is left blank, the plugin still exports Office fields when detected so mixed device fleets can preserve their existing types safely
 - keep server devices on the existing server telemetry lane rather than exporting them through this plugin
 - legacy HTTP export retries once without `healthSignals` if an older endpoint rejects that field
 - direct Supabase export retries once without unsupported plugin/health columns if the target schema has not been migrated yet

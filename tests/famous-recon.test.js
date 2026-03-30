@@ -135,7 +135,7 @@ test("telemetry payload includes health signals for admin exports", () => {
     });
 });
 
-test("telemetry payload omits admin-only office fields for non-admin exports", () => {
+test("telemetry payload preserves Office fields when the rollout preserves existing device type", () => {
     const payload = buildTelemetryPayload({
         nodeId: "node//sample/pos1",
         systemSummary: {
@@ -158,12 +158,15 @@ test("telemetry payload omits admin-only office fields for non-admin exports", (
         scanMode: "status",
         pluginVersion: "0.1.16",
         deviceId: "POS1",
-        deviceType: "pos",
+        deviceType: "",
         inventoryChanged: false
     });
 
     assert.deepEqual(payload.healthSignals, {
         pendingReboot: false,
+        officeActivationStatus: "licensed",
+        officeProductName: "Microsoft 365 Apps for enterprise",
+        officeExpiresAt: "2026-06-26T16:58:25.936Z",
         unexpectedShutdownCount7d: 2,
         diskHealthStatus: "warning"
     });

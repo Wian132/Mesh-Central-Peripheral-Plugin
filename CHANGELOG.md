@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.21
+
+- Fixed FamousRecon Office export when the plugin is left on `Preserve existing device type`, so Office status, product, and expiry are no longer dropped from mixed Admin/POS/Other rollouts.
+- Kept the generic health signals unchanged while updating payload tests to cover the preserve-existing-device-type path explicitly.
+
 ## 0.1.20
 
 - Fixed `vnextdiag.ps1 -action list` normalization for the real JSON-style output emitted by Microsoft 365 endpoints, so Admin Office status no longer falls through to `unknown`.
