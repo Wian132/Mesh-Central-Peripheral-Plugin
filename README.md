@@ -25,7 +25,9 @@ This is intentional. MeshCentral's documented plugin hooks are enough for the se
 
 Manual refresh remains available.
 
-Scheduled scanning is disabled by default until an admin enables it for explicit device groups or node IDs.
+Scheduled scanning is enabled by default for new installs, but it still only runs for explicit device groups or node IDs in the rollout scope.
+
+Older scoped installs that were created with the previous "scheduler off" default are auto-migrated to scheduled scanning on upgrade, so existing pilot groups start scanning without another admin-panel toggle.
 
 Once enabled, the default cadence is:
 - status scan every 1 minute
@@ -169,8 +171,8 @@ Key settings:
 - `integrations.famousRecon.requestTimeoutMs`
 
 Recommended v1 rollout config:
-- keep scheduled scans disabled until a test group is selected
 - set only one Windows test group in `scope.meshIds`
+- leave scheduled scans on once that test group is selected
 - leave status interval at `1`
 - leave full interval at `15`
 - leave `advancedOneMinuteFullInventory` off

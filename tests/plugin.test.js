@@ -119,6 +119,44 @@ test("server startup queues one-time full scans for scoped online Windows agents
     assert.match(String(sent[0].initiatedBy), /^plugin-upgrade:/);
 });
 
+test("server startup migrates legacy scoped configs to enable scheduled scans", () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-migrate-"));
+    const parent = {
+        datapath,
+        config: { domains: { "": { id: "" } } },
+        webserver: {
+            wsagents: {},
+            meshes: {},
+            CreateNodeDispatchTargets() { return []; },
+            GetNodeWithRights(domain, user, nodeId, callback) { callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true); }
+        },
+        DispatchEvent() {},
+        debug() {}
+    };
+
+    const instance = pluginFactory({
+        parent,
+        registerPluginTab() {}
+    });
+
+    instance.persistence.saveConfig({
+        version: 1,
+        schedule: {
+            enabled: false
+        },
+        scope: {
+            meshIds: ["mesh//test"],
+            nodeIds: []
+        }
+    });
+
+    instance.server_startup();
+    clearInterval(instance.runtime.schedulerTimer);
+
+    assert.equal(instance.runtime.config.schedule.enabled, true);
+    assert.equal(instance.persistence.loadConfig({}).schedule.enabled, true);
+});
+
 test("server startup skips upgrade refresh when the current plugin version was already applied", () => {
     const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-current-"));
     const sent = [];

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.19
+
+- Enabled scheduled scans by default for new installs while still requiring explicit `scope.meshIds` or `scope.nodeIds` targets before any device is polled.
+- Added a config migration that auto-enables scheduled scans for older scoped installs created with the previous scheduler-off default, so pilot groups start scanning immediately after upgrade.
+
 ## 0.1.18
 
 - Added `admin` as a valid FamousRecon device type override in config validation, admin UI, and test coverage.
