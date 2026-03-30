@@ -136,8 +136,26 @@ test("office normalization maps OSPP statuses into shared admin health values", 
     assert.equal(licensed.officeProductName, "Office 16, Office16ProPlusVL_KMS_Client edition");
     assert.equal(unlicensed.officeActivationStatus, "unlicensed");
     assert.equal(notification.officeActivationStatus, "notification");
+    assert.equal(notification.officeLicenseDescription, "Office 16, RETAIL(Grace) channel");
+    assert.equal(notification.officeErrorDescription, "Remaining grace: 4 days");
     assert.equal(unknown.officeActivationStatus, "unknown");
     assert.equal(unknown.officeProductName, null);
+});
+
+test("office normalization preserves OSPP diagnostic error details", () => {
+    const notification = normalizeOfficeActivation({
+        method: "ospp-vbs",
+        rawOutput: readFixture("ospp-dstatus-notifications-secure-store.txt")
+    });
+
+    assert.equal(notification.officeActivationStatus, "notification");
+    assert.equal(notification.officeProductName, "Office 16, Office16O365HomePremR_Subscription4 edition");
+    assert.equal(notification.officeLicenseDescription, "Office 16, TIMEBASED_SUB channel");
+    assert.equal(notification.officeErrorCode, "0xC004E022");
+    assert.equal(
+        notification.officeErrorDescription,
+        "The Software Licensing Service reported that the secure store id value in license does not match with the current value."
+    );
 });
 
 test("health signal normalization parses vnext output and preserves generic signals", () => {
@@ -193,6 +211,9 @@ test("health signal merge prefers cached full data with the latest pending reboo
                 officeActivationStatus: "licensed",
                 officeProductName: "Microsoft 365 Apps for enterprise",
                 officeExpiresAt: "2026-06-26T16:58:25.936Z",
+                officeLicenseDescription: "Microsoft 365 Apps for enterprise",
+                officeErrorCode: "0x0",
+                officeErrorDescription: "Licensed",
                 unexpectedShutdownCount7d: 1,
                 diskHealthStatus: "warning"
             }
@@ -204,6 +225,9 @@ test("health signal merge prefers cached full data with the latest pending reboo
         officeActivationStatus: "licensed",
         officeProductName: "Microsoft 365 Apps for enterprise",
         officeExpiresAt: "2026-06-26T16:58:25.936Z",
+        officeLicenseDescription: "Microsoft 365 Apps for enterprise",
+        officeErrorCode: "0x0",
+        officeErrorDescription: "Licensed",
         unexpectedShutdownCount7d: 1,
         diskHealthStatus: "warning"
     });

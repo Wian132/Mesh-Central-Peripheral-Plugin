@@ -111,6 +111,9 @@ test("telemetry payload includes health signals for admin exports", () => {
             officeActivationStatus: "licensed",
             officeProductName: "Microsoft 365 Apps for enterprise",
             officeExpiresAt: "2026-06-26T16:58:25.936Z",
+            officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+            officeErrorCode: "0xC004E022",
+            officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
             unexpectedShutdownCount7d: 0,
             diskHealthStatus: "healthy"
         },
@@ -130,6 +133,9 @@ test("telemetry payload includes health signals for admin exports", () => {
         officeActivationStatus: "licensed",
         officeProductName: "Microsoft 365 Apps for enterprise",
         officeExpiresAt: "2026-06-26T16:58:25.936Z",
+        officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+        officeErrorCode: "0xC004E022",
+        officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
         unexpectedShutdownCount7d: 0,
         diskHealthStatus: "healthy"
     });
@@ -148,6 +154,9 @@ test("telemetry payload preserves Office fields when the rollout preserves exist
             officeActivationStatus: "licensed",
             officeProductName: "Microsoft 365 Apps for enterprise",
             officeExpiresAt: "2026-06-26T16:58:25.936Z",
+            officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+            officeErrorCode: "0xC004E022",
+            officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
             unexpectedShutdownCount7d: 2,
             diskHealthStatus: "warning"
         },
@@ -167,6 +176,9 @@ test("telemetry payload preserves Office fields when the rollout preserves exist
         officeActivationStatus: "licensed",
         officeProductName: "Microsoft 365 Apps for enterprise",
         officeExpiresAt: "2026-06-26T16:58:25.936Z",
+        officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+        officeErrorCode: "0xC004E022",
+        officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
         unexpectedShutdownCount7d: 2,
         diskHealthStatus: "warning"
     });

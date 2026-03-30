@@ -1,0 +1,13 @@
+---Processing--------------------------
+---------------------------------------
+PRODUCT ID: 00201-10998-04614-AA411
+SKU ID: b58a5943-16ea-420f-a611-7b230acd762c
+LICENSE NAME: Office 16, Office16O365HomePremR_Subscription4 edition
+LICENSE DESCRIPTION: Office 16, TIMEBASED_SUB channel
+LICENSE STATUS:  ---NOTIFICATIONS---
+ERROR CODE: 0xC004E022
+ERROR DESCRIPTION: The Software Licensing Service reported that the secure store id value in license does not match with the current value.
+Last 5 characters of installed product key: T28F4
+---------------------------------------
+---------------------------------------
+---Exiting-----------------------------

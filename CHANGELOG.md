@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.23
+
+- Added Office activation diagnostic telemetry fields for richer Admin troubleshooting: license description, error code, and error description.
+- FamousRecon exports can now surface specific OSPP-style activation problems such as `0xC004E022` instead of only the generic `notification` status.
+
 ## 0.1.22
 
 - Fixed Office probe path detection for Click-to-Run installs under `Microsoft Office\\root\\Office16`, which was causing some Admin devices to report Office as `unknown` even though Microsoft 365 was installed.

@@ -138,6 +138,9 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
             officeActivationStatus: "notification",
             officeProductName: "Microsoft 365 Apps for enterprise",
             officeExpiresAt: "2026-06-26T16:58:25.936Z",
+            officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+            officeErrorCode: "0xC004E022",
+            officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
             unexpectedShutdownCount7d: 2,
             diskHealthStatus: "warning"
         },
@@ -170,6 +173,9 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
     assert.equal(row.office_activation_status, "notification");
     assert.equal(row.office_product_name, "Microsoft 365 Apps for enterprise");
     assert.equal(row.office_expires_at, "2026-06-26T16:58:25.936Z");
+    assert.equal(row.office_license_description, "Office 16, TIMEBASED_SUB channel");
+    assert.equal(row.office_error_code, "0xC004E022");
+    assert.equal(row.office_error_description, "The Software Licensing Service reported that the secure store id value in license does not match with the current value.");
     assert.equal(row.unexpected_shutdown_count_7d, 2);
     assert.equal(row.disk_health_status, "warning");
     assert.equal(row.telemetry_source, "agent");
@@ -304,6 +310,9 @@ test("sendTelemetryToSupabase retries without unsupported plugin health columns"
                     officeActivationStatus: "licensed",
                     officeProductName: "Microsoft 365 Apps for enterprise",
                     officeExpiresAt: "2026-06-26T16:58:25.936Z",
+                    officeLicenseDescription: "Office 16, TIMEBASED_SUB channel",
+                    officeErrorCode: "0xC004E022",
+                    officeErrorDescription: "The Software Licensing Service reported that the secure store id value in license does not match with the current value.",
                     unexpectedShutdownCount7d: 1,
                     diskHealthStatus: "healthy"
                 },
@@ -317,8 +326,14 @@ test("sendTelemetryToSupabase retries without unsupported plugin health columns"
         assert.equal(posts.length, 2);
         assert.equal(posts[0].office_activation_status, "licensed");
         assert.equal(posts[0].office_expires_at, "2026-06-26T16:58:25.936Z");
+        assert.equal(posts[0].office_license_description, "Office 16, TIMEBASED_SUB channel");
+        assert.equal(posts[0].office_error_code, "0xC004E022");
+        assert.equal(posts[0].office_error_description, "The Software Licensing Service reported that the secure store id value in license does not match with the current value.");
         assert.equal(posts[1].office_activation_status, undefined);
         assert.equal(posts[1].office_expires_at, undefined);
+        assert.equal(posts[1].office_license_description, undefined);
+        assert.equal(posts[1].office_error_code, undefined);
+        assert.equal(posts[1].office_error_description, undefined);
     } finally {
         global.fetch = originalFetch;
     }
