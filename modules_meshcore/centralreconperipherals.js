@@ -149,8 +149,11 @@ function buildPowerShellScript(mode, outputPath) {
         "  $osppCandidates = @()",
         "  $vnextCandidates = @()",
         "  foreach ($root in $programRoots) {",
+        "    $osppCandidates += (Join-Path $root 'Microsoft Office\\root\\Office16\\OSPP.VBS')",
         "    $osppCandidates += (Join-Path $root 'Microsoft Office\\Office16\\OSPP.VBS')",
+        "    $osppCandidates += (Join-Path $root 'Microsoft Office\\root\\Office15\\OSPP.VBS')",
         "    $osppCandidates += (Join-Path $root 'Microsoft Office\\Office15\\OSPP.VBS')",
+        "    $vnextCandidates += (Join-Path $root 'Microsoft Office\\root\\Office16\\vnextdiag.ps1')",
         "    $vnextCandidates += (Join-Path $root 'Microsoft Office\\Office16\\vnextdiag.ps1')",
         "  }",
         "  $vnextPath = Get-ExistingPath $vnextCandidates",
@@ -375,6 +378,7 @@ function consoleaction(args, rights, sessionid, parent) {
 }
 
 module.exports = {
+    buildPowerShellScript: buildPowerShellScript,
     consoleaction: consoleaction,
     buildScanPaths: buildScanPaths,
     getPowerShellArgs: getPowerShellArgs,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.22
+
+- Fixed Office probe path detection for Click-to-Run installs under `Microsoft Office\\root\\Office16`, which was causing some Admin devices to report Office as `unknown` even though Microsoft 365 was installed.
+- Added a meshcore regression test to keep the `root\\Office16` Office probe paths covered.
+
 ## 0.1.21
 
 - Fixed FamousRecon Office export when the plugin is left on `Preserve existing device type`, so Office status, product, and expiry are no longer dropped from mixed Admin/POS/Other rollouts.
