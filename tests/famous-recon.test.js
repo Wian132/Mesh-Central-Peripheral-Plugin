@@ -110,6 +110,7 @@ test("telemetry payload includes health signals for admin exports", () => {
             pendingReboot: true,
             officeActivationStatus: "licensed",
             officeProductName: "Microsoft 365 Apps for enterprise",
+            officeExpiresAt: "2026-06-26T16:58:25.936Z",
             unexpectedShutdownCount7d: 0,
             diskHealthStatus: "healthy"
         },
@@ -128,6 +129,7 @@ test("telemetry payload includes health signals for admin exports", () => {
         pendingReboot: true,
         officeActivationStatus: "licensed",
         officeProductName: "Microsoft 365 Apps for enterprise",
+        officeExpiresAt: "2026-06-26T16:58:25.936Z",
         unexpectedShutdownCount7d: 0,
         diskHealthStatus: "healthy"
     });
@@ -145,6 +147,7 @@ test("telemetry payload omits admin-only office fields for non-admin exports", (
             pendingReboot: false,
             officeActivationStatus: "licensed",
             officeProductName: "Microsoft 365 Apps for enterprise",
+            officeExpiresAt: "2026-06-26T16:58:25.936Z",
             unexpectedShutdownCount7d: 2,
             diskHealthStatus: "warning"
         },

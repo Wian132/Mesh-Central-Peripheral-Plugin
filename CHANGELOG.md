@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.20
+
+- Fixed `vnextdiag.ps1 -action list` normalization for the real JSON-style output emitted by Microsoft 365 endpoints, so Admin Office status no longer falls through to `unknown`.
+- Updated the Office probe to prefer `vnextdiag.ps1` when it exposes live license records, with `OSPP.VBS` retained as the fallback for older perpetual-style installs.
+- Added `officeExpiresAt` / `office_expires_at` through the MeshCentral plugin export path so FamousRecon can track when the detected Office entitlement expires.
+- Added fixture coverage for JSON-style `vnextdiag` payloads with `NotAfter` dates and updated export-row tests for the new Office expiry field.
+
 ## 0.1.19
 
 - Enabled scheduled scans by default for new installs while still requiring explicit `scope.meshIds` or `scope.nodeIds` targets before any device is polled.

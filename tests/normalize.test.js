@@ -169,6 +169,17 @@ test("health signal normalization parses vnext output and preserves generic sign
     });
 });
 
+test("office normalization parses JSON-style vnextdiag output and captures expiry", () => {
+    const licensed = normalizeOfficeActivation({
+        method: "vnextdiag",
+        rawOutput: readFixture("vnextdiag-json-licensed.txt")
+    });
+
+    assert.equal(licensed.officeActivationStatus, "licensed");
+    assert.equal(licensed.officeProductName, "O365ProPlusRetail");
+    assert.equal(licensed.officeExpiresAt, "2026-06-26T16:58:25.936Z");
+});
+
 test("health signal merge prefers cached full data with the latest pending reboot value", () => {
     const merged = mergeHealthSignals(
         {
@@ -181,6 +192,7 @@ test("health signal merge prefers cached full data with the latest pending reboo
                 pendingReboot: true,
                 officeActivationStatus: "licensed",
                 officeProductName: "Microsoft 365 Apps for enterprise",
+                officeExpiresAt: "2026-06-26T16:58:25.936Z",
                 unexpectedShutdownCount7d: 1,
                 diskHealthStatus: "warning"
             }
@@ -191,6 +203,7 @@ test("health signal merge prefers cached full data with the latest pending reboo
         pendingReboot: false,
         officeActivationStatus: "licensed",
         officeProductName: "Microsoft 365 Apps for enterprise",
+        officeExpiresAt: "2026-06-26T16:58:25.936Z",
         unexpectedShutdownCount7d: 1,
         diskHealthStatus: "warning"
     });

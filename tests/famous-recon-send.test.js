@@ -137,6 +137,7 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
             pendingReboot: true,
             officeActivationStatus: "notification",
             officeProductName: "Microsoft 365 Apps for enterprise",
+            officeExpiresAt: "2026-06-26T16:58:25.936Z",
             unexpectedShutdownCount7d: 2,
             diskHealthStatus: "warning"
         },
@@ -168,6 +169,7 @@ test("buildSupabaseRow maps payload fields to DB column names", () => {
     assert.equal(row.pending_reboot, true);
     assert.equal(row.office_activation_status, "notification");
     assert.equal(row.office_product_name, "Microsoft 365 Apps for enterprise");
+    assert.equal(row.office_expires_at, "2026-06-26T16:58:25.936Z");
     assert.equal(row.unexpected_shutdown_count_7d, 2);
     assert.equal(row.disk_health_status, "warning");
     assert.equal(row.telemetry_source, "agent");
@@ -301,6 +303,7 @@ test("sendTelemetryToSupabase retries without unsupported plugin health columns"
                     pendingReboot: true,
                     officeActivationStatus: "licensed",
                     officeProductName: "Microsoft 365 Apps for enterprise",
+                    officeExpiresAt: "2026-06-26T16:58:25.936Z",
                     unexpectedShutdownCount7d: 1,
                     diskHealthStatus: "healthy"
                 },
@@ -313,7 +316,9 @@ test("sendTelemetryToSupabase retries without unsupported plugin health columns"
         assert.equal(result.ok, true);
         assert.equal(posts.length, 2);
         assert.equal(posts[0].office_activation_status, "licensed");
+        assert.equal(posts[0].office_expires_at, "2026-06-26T16:58:25.936Z");
         assert.equal(posts[1].office_activation_status, undefined);
+        assert.equal(posts[1].office_expires_at, undefined);
     } finally {
         global.fetch = originalFetch;
     }

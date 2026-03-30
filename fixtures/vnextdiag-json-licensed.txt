@@ -1,0 +1,27 @@
+========== Mode per ProductReleaseId ==========
+o365homepremretail = vNext
+O365ProPlusRetail = vNext
+
+========== Shared Computer Licensing ==========
+No registry keys found.
+
+========== vNext licenses found ==========
+{
+    "Version":  "5",
+    "Type":  "User|Subscription",
+    "Product":  "O365ProPlusRetail",
+    "Acid":  "149dbce7-a48e-44db-8364-a53386cd4580",
+    "Email":  null,
+    "LicenseState":  "Licensed",
+    "EntitlementStatus":  "Provisioned",
+    "EntitlementExpiration":  null,
+    "ReasonCode":  null,
+    "NotBefore":  "2026-03-27T16:58:25.9366651Z",
+    "NotAfter":  "2026-06-26T16:58:25.9366651Z",
+    "NextRenewal":  "2026-03-31T23:58:25.9366651Z",
+    "TenantId":  "b14d86f1-83ba-4b13-a702-b5c0231b9337",
+    "LicenseId":  "EWW_dda0ed76-4dfd-4c29-bb06-290c00a716a1_1db02d60f664d00dc6"
+}
+
+========== Device licenses found ==========
+No licenses found.

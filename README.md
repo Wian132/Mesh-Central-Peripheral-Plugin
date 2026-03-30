@@ -55,7 +55,8 @@ Full scans:
 - `Get-CimInstance Win32_Processor`
 - `Get-CimInstance Win32_OperatingSystem`
 - `Get-CimInstance Win32_LogicalDisk`
-- `OSPP.VBS /dstatus` when available for Office activation
+- `vnextdiag.ps1 -action list` when available for Microsoft 365-style activation data and expiry dates
+- `OSPP.VBS /dstatus` as the fallback for older perpetual-style Office installs
 - `vnextdiag.ps1 -action list` as a fallback for Microsoft 365 Apps activation
 - `Get-WinEvent` for unexpected shutdown count over the last 7 days
 - `Get-PhysicalDisk` for best-effort disk health
@@ -95,12 +96,13 @@ Health signal fields exported to FamousRecon when available:
 - `pendingReboot`
 - `officeActivationStatus`
 - `officeProductName`
+- `officeExpiresAt`
 - `unexpectedShutdownCount7d`
 - `diskHealthStatus`
 
 Office activation notes:
 - Office activation is normalized in JS on the plugin server from raw collector output.
-- Admin exports prefer `OSPP.VBS /dstatus` first and fall back to `vnextdiag.ps1 -action list` when OSPP is unavailable or not applicable.
+- Admin exports prefer `vnextdiag.ps1 -action list` when it exposes live license data, and fall back to `OSPP.VBS /dstatus` for older perpetual-style installs.
 - Expensive health signals are collected on full scans and merged into later status-scan exports from the last known full snapshot.
 
 ## Installation
