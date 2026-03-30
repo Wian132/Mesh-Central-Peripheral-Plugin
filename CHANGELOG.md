@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.17
+## 0.1.18
 
 - Added `admin` as a valid FamousRecon device type override in config validation, admin UI, and test coverage.
 - Extended the FamousRecon payload contract with optional `healthSignals` and mapped the new fields into direct Supabase columns: `pending_reboot`, `office_activation_status`, `office_product_name`, `unexpected_shutdown_count_7d`, and `disk_health_status`.
@@ -11,6 +11,7 @@
 - Direct Supabase export now retries once without unsupported plugin/health columns when posting into an older schema.
 - Added fixture-driven tests for Office normalization, merged health-signal behavior, backward-compat retries, and the Admin device type path.
 - Gated the Supabase E2E test behind environment variables so `npm test` stays green by default while `npm run test:e2e:supabase` remains available for manual credentialed validation.
+- Plugin upgrades now queue one-time full refreshes for scoped online Windows agents automatically, and agents that reconnect later will also refresh until they have completed a full scan on the new plugin version.
 
 ## 0.1.15
 

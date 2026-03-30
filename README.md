@@ -36,6 +36,8 @@ Once enabled, the default cadence is:
 
 Advanced mode allows 1-minute full inventory, but it is not the default.
 
+When the plugin version itself is upgraded, the plugin automatically queues a one-time full refresh for scoped online Windows agents. Devices that reconnect later will also trigger a full refresh until they have completed one full scan on the new plugin version, so a plugin upgrade does not require opening each device page manually.
+
 ## What Gets Collected
 
 Status scans:

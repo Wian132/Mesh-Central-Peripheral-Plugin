@@ -66,6 +66,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             nodeId,
             meshId: meshId || null,
             domainId: parseDomainIdFromNodeId(nodeId),
+            lastPluginVersionApplied: null,
             statusSnapshot: null,
             statusHash: null,
             lastStatusScanAt: null,
@@ -183,6 +184,14 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         return ((agentId > 0 && agentId < 5) || (agentId > 41 && agentId < 44));
     }
 
+    function getCurrentPluginVersion() {
+        return String(pluginMetadata.version || "");
+    }
+
+    function needsPluginUpgradeFullScan(state) {
+        return String(state && state.lastPluginVersionApplied || "") !== getCurrentPluginVersion();
+    }
+
     function getEligibleOnlineAgents() {
         const webserver = getWebServer();
         if (webserver == null || webserver.wsagents == null) { return []; }
@@ -193,6 +202,19 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     function queueFullScan(state, reason) {
         state.scheduler.queuedFull = true;
         state.scheduler.queuedFullReason = reason || "schedule";
+    }
+
+    function queuePluginUpgradeFullScansForOnlineAgents() {
+        const eligibleAgents = getEligibleOnlineAgents()
+            .filter((agent) => isLikelyWindowsAgent(agent));
+
+        for (const agent of eligibleAgents) {
+            const state = loadState(agent.dbNodeKey, agent.dbMeshKey);
+            if (!needsPluginUpgradeFullScan(state)) { continue; }
+            if (state.scheduler && state.scheduler.runningMode === "full") { continue; }
+            queueFullScan(state, "plugin-upgrade:" + getCurrentPluginVersion());
+            saveState(agent.dbNodeKey, state);
+        }
     }
 
     function emitNodeEvent(nodeId, meshId, message, action, extra) {
@@ -415,7 +437,6 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         try {
             reapTimedOutRequests();
             const config = obj.runtime.config;
-            if (!config.schedule.enabled) { return; }
 
             const eligibleAgents = getEligibleOnlineAgents()
                 .filter((agent) => isLikelyWindowsAgent(agent));
@@ -425,7 +446,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
             for (const agent of eligibleAgents) {
                 const state = loadState(agent.dbNodeKey, agent.dbMeshKey);
-                ensureScheduleState(state, now, config, Math.random);
+                if (config.schedule.enabled) {
+                    ensureScheduleState(state, now, config, Math.random);
+                }
                 if (state.scheduler.runningMode) {
                     saveState(agent.dbNodeKey, state);
                     continue;
@@ -435,7 +458,12 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                     continue;
                 }
 
-                const dueMode = determineDueMode(state, now);
+                let dueMode = null;
+                if (state.scheduler.queuedFull) {
+                    dueMode = "full";
+                } else if (config.schedule.enabled) {
+                    dueMode = determineDueMode(state, now);
+                }
                 if (dueMode) {
                     const dueAt = dueMode === "full" ? (state.scheduler.nextFullScanAt || now) : (state.scheduler.nextStatusScanAt || now);
                     candidates.push({
@@ -500,6 +528,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         state.changedSincePrevious = diff.changed;
         state.lastFullScanAt = nowMs();
         state.lastFullResult = "ok";
+        state.lastPluginVersionApplied = getCurrentPluginVersion();
         state.lastError = null;
 
         emitFullInventoryEvents(state, diff);
@@ -639,6 +668,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     obj.server_startup = function () {
         reloadRuntimeConfig();
+        queuePluginUpgradeFullScansForOnlineAgents();
         scheduleEvaluator();
         evaluateSchedule();
     };
@@ -651,6 +681,12 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const state = loadState(agent.dbNodeKey, agent.dbMeshKey);
         state.scheduler.unsupportedUntil = null;
         saveState(agent.dbNodeKey, state);
+        if (isNodeInScope(agent.dbNodeKey, agent.dbMeshKey) && isLikelyWindowsAgent(agent) && needsPluginUpgradeFullScan(state)) {
+            queueFullScan(state, "plugin-upgrade:" + getCurrentPluginVersion());
+            saveState(agent.dbNodeKey, state);
+            evaluateSchedule();
+            return;
+        }
         if (obj.runtime.config.schedule.enabled && obj.runtime.config.schedule.fullOnReconnect && isNodeInScope(agent.dbNodeKey, agent.dbMeshKey) && isLikelyWindowsAgent(agent)) {
             dispatchScan(agent.dbNodeKey, agent.dbMeshKey, "full", "reconnect");
         }
