@@ -22,6 +22,7 @@ const {
 const { renderAdminPage, renderDevicePage } = require("./lib/ui");
 const {
     buildExportAttemptLogLine,
+    fetchFleetDeviceConfig,
     buildTelemetryPayload,
     sendTelemetry,
     sendTelemetryToSupabase,
@@ -32,6 +33,8 @@ const { safeJsonParse, uniqueStrings } = require("./lib/utils");
 const SITERIGHT_ADMIN = 0xFFFFFFFF;
 const MESHRIGHT_REMOTECOMMAND = 0x00020000;
 const DISPLAY_NAME = "CentralRecon Peripherals";
+const SHUTDOWN_CONTROL_REFRESH_MS = 60 * 1000;
+const SHUTDOWN_ACTIVE_GRACE_MS = 90 * 1000;
 
 module.exports[SHORT_NAME] = function (pluginHandler) {
     const obj = {};
@@ -47,6 +50,8 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             paymentTerminals: compileRules(cloneDefaultConfig().matching.paymentTerminals)
         },
         activeRequests: new Map(),
+        activeShutdowns: new Map(),
+        shutdownControlCache: new Map(),
         schedulerTimer: null,
         evaluating: false
     };
@@ -92,6 +97,16 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             events: {
                 lastFailureEventAt: null,
                 lastFailureEventKey: null
+            },
+            shutdown: {
+                lastAttemptedSlotKey: null,
+                declinedDate: null,
+                lastResultStatus: null,
+                lastResultAt: null,
+                lastError: null,
+                activeRequestId: null,
+                activeSince: null,
+                activeUntil: null
             }
         };
     }
@@ -102,6 +117,10 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         if (!state.domainId) { state.domainId = parseDomainIdFromNodeId(nodeId); }
         if (!state.scheduler) { state.scheduler = createEmptyState(nodeId, meshId).scheduler; }
         if (!state.events) { state.events = createEmptyState(nodeId, meshId).events; }
+        if (!state.shutdown) { state.shutdown = createEmptyState(nodeId, meshId).shutdown; }
+        if (!Object.prototype.hasOwnProperty.call(state.shutdown, "activeUntil")) {
+            state.shutdown.activeUntil = null;
+        }
         return state;
     }
 
@@ -319,6 +338,135 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         emitFailureEventIfNeeded(state, mode, error);
     }
 
+    function getFamousReconIdentityForState(state) {
+        const viewState = buildViewState(state);
+        const operatingSystem = viewState && viewState.systemSummary && viewState.systemSummary.operatingSystem
+            ? viewState.systemSummary.operatingSystem
+            : {};
+        const deviceId = String(operatingSystem.computerName || "").trim();
+        if (deviceId === "" || !state.nodeId) { return null; }
+        return {
+            nodeId: state.nodeId,
+            deviceId,
+            deviceType:
+                obj.runtime.config &&
+                obj.runtime.config.integrations &&
+                obj.runtime.config.integrations.famousRecon &&
+                obj.runtime.config.integrations.famousRecon.deviceType
+                    ? obj.runtime.config.integrations.famousRecon.deviceType
+                    : ""
+        };
+    }
+
+    function resetShutdownNightState(state, nightKey) {
+        if (!state.shutdown) { return; }
+        if (state.shutdown.declinedDate && state.shutdown.declinedDate !== nightKey) {
+            state.shutdown.declinedDate = null;
+        }
+        if (
+            state.shutdown.lastAttemptedSlotKey &&
+            String(state.shutdown.lastAttemptedSlotKey).indexOf(nightKey + ":") !== 0
+        ) {
+            state.shutdown.lastAttemptedSlotKey = null;
+        }
+    }
+
+    function markShutdownState(state, status, error) {
+        if (!state.shutdown) { return; }
+        state.shutdown.lastResultStatus = status || null;
+        state.shutdown.lastResultAt = nowMs();
+        state.shutdown.lastError = error || null;
+    }
+
+    function dispatchShutdown(nodeId, meshId, options) {
+        const state = loadState(nodeId, meshId);
+        const webserver = getWebServer();
+        const now = nowMs();
+
+        if (!options || !options.slotKey) {
+            return { ok: false, message: "Missing shutdown slot key." };
+        }
+        if (obj.runtime.activeShutdowns.has(nodeId)) {
+            return { ok: false, message: "A shutdown attempt is already active for this device." };
+        }
+        if (webserver == null || webserver.wsagents == null) {
+            return { ok: false, message: "MeshCentral webserver is not ready yet." };
+        }
+
+        const agent = webserver.wsagents[nodeId];
+        if (agent == null) {
+            return { ok: false, message: "The device agent is not connected." };
+        }
+
+        const countdownSec = Math.max(30, Number(options.countdownSec) || 300);
+        const requestId = createHashHex([nodeId, meshId, "shutdown", options.slotKey, now]).slice(0, 24);
+
+        state.shutdown.activeRequestId = requestId;
+        state.shutdown.activeSince = now;
+        state.shutdown.activeUntil = now + (countdownSec * 1000) + SHUTDOWN_ACTIVE_GRACE_MS;
+        state.shutdown.lastAttemptedSlotKey = options.slotKey;
+        markShutdownState(state, "dispatched", null);
+        saveState(nodeId, state);
+
+        obj.runtime.activeShutdowns.set(nodeId, {
+            requestId,
+            nodeId,
+            meshId,
+            slotKey: options.slotKey,
+            nightKey: options.nightKey || null,
+            countdownSec,
+            startedAt: now,
+            timeoutAt: now + (countdownSec * 1000) + SHUTDOWN_ACTIVE_GRACE_MS
+        });
+
+        try {
+            agent.send(JSON.stringify({
+                action: "plugin",
+                plugin: SHORT_NAME,
+                pluginaction: "shutdown",
+                requestId,
+                slotKey: options.slotKey,
+                nightKey: options.nightKey || null,
+                countdownSec
+            }));
+            emitNodeEvent(
+                nodeId,
+                meshId,
+                "Nightly POS shutdown countdown dispatched (" + countdownSec + "s).",
+                SHORT_NAME + "-shutdown"
+            );
+            return { ok: true, message: "Nightly POS shutdown dispatched." };
+        } catch (error) {
+            obj.runtime.activeShutdowns.delete(nodeId);
+            state.shutdown.activeRequestId = null;
+            state.shutdown.activeSince = null;
+            state.shutdown.activeUntil = null;
+            markShutdownState(
+                state,
+                "dispatch_error",
+                error && error.message ? error.message : String(error)
+            );
+            saveState(nodeId, state);
+            return { ok: false, message: "Unable to send shutdown request to the agent." };
+        }
+    }
+
+    function reapTimedOutShutdowns() {
+        const now = nowMs();
+        for (const active of obj.runtime.activeShutdowns.values()) {
+            if (now <= active.timeoutAt) { continue; }
+            obj.runtime.activeShutdowns.delete(active.nodeId);
+            const state = loadState(active.nodeId, active.meshId);
+            state.shutdown.activeRequestId = null;
+            state.shutdown.activeSince = null;
+            state.shutdown.activeUntil = null;
+            if (state.shutdown.lastResultStatus === "dispatched") {
+                markShutdownState(state, "awaiting_offline", null);
+            }
+            saveState(active.nodeId, state);
+        }
+    }
+
     function updatePrinterStatusEvents(state, previousSnapshot, nextSnapshot) {
         if (!obj.runtime.config.logging.changeEvents) { return; }
         const previousMap = new Map((previousSnapshot && previousSnapshot.printers ? previousSnapshot.printers : []).map((printer) => [printer.name, printer]));
@@ -430,7 +578,120 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         }
     }
 
-    function evaluateSchedule() {
+    async function evaluateShutdownWaterfall(eligibleAgents) {
+        const integration = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
+            ? obj.runtime.config.integrations.famousRecon
+            : null;
+
+        reapTimedOutShutdowns();
+        if (integration == null || integration.enabled !== true) { return; }
+
+        const now = nowMs();
+
+        for (const agent of eligibleAgents) {
+            const state = loadState(agent.dbNodeKey, agent.dbMeshKey);
+            if (!state.shutdown) { state.shutdown = createEmptyState(agent.dbNodeKey, agent.dbMeshKey).shutdown; }
+
+            if (obj.runtime.activeShutdowns.has(agent.dbNodeKey)) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+            if (state.shutdown.activeUntil && now < state.shutdown.activeUntil) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+            if (state.shutdown.activeUntil && now >= state.shutdown.activeUntil) {
+                state.shutdown.activeRequestId = null;
+                state.shutdown.activeSince = null;
+                state.shutdown.activeUntil = null;
+            }
+
+            const identity = getFamousReconIdentityForState(state);
+            if (!identity) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+
+            const cached = obj.runtime.shutdownControlCache.get(agent.dbNodeKey);
+            let control = cached;
+            if (!control || (now - control.fetchedAt) >= SHUTDOWN_CONTROL_REFRESH_MS) {
+                const response = await fetchFleetDeviceConfig(integration, identity);
+                control = {
+                    fetchedAt: nowMs(),
+                    response
+                };
+                obj.runtime.shutdownControlCache.set(agent.dbNodeKey, control);
+            }
+
+            if (!control.response || control.response.ok !== true || control.response.skipped) {
+                if (control.response && control.response.ok === false && control.response.error) {
+                    markShutdownState(state, "control_error", control.response.error);
+                }
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+
+            const responseData = control.response.data || {};
+            const shutdownState = responseData.shutdown_state || null;
+            if (!shutdownState || shutdownState.device_type !== "pos") {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+
+            const nightKey = String(shutdownState.current_date_local || "");
+            if (nightKey) { resetShutdownNightState(state, nightKey); }
+            if (state.shutdown.declinedDate && state.shutdown.declinedDate === nightKey) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+            if (!shutdownState.participates_in_waterfall) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+            if (!shutdownState.slot_due_now || !shutdownState.current_slot_key) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+            if (state.shutdown.lastAttemptedSlotKey === shutdownState.current_slot_key) {
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+
+            state.shutdown.lastAttemptedSlotKey = shutdownState.current_slot_key;
+
+            if (shutdownState.shutdown_allowed !== true) {
+                markShutdownState(
+                    state,
+                    "blocked",
+                    Array.isArray(shutdownState.blocking_reasons) && shutdownState.blocking_reasons.length > 0
+                        ? shutdownState.blocking_reasons.join(" | ")
+                        : String(shutdownState.summary || "backend_blocked")
+                );
+                saveState(agent.dbNodeKey, state);
+                continue;
+            }
+
+            const countdownSec = Math.max(
+                30,
+                Number(
+                    responseData.config && responseData.config.shutdown_countdown_sec != null
+                        ? responseData.config.shutdown_countdown_sec
+                        : 300
+                )
+            );
+            const dispatchResult = dispatchShutdown(agent.dbNodeKey, agent.dbMeshKey, {
+                slotKey: shutdownState.current_slot_key,
+                nightKey: nightKey || null,
+                countdownSec
+            });
+            if (!dispatchResult.ok) {
+                markShutdownState(state, "dispatch_error", dispatchResult.message || "dispatch_failed");
+                saveState(agent.dbNodeKey, state);
+            }
+        }
+    }
+
+    async function evaluateSchedule() {
         if (obj.runtime.evaluating) { return; }
         obj.runtime.evaluating = true;
 
@@ -486,16 +747,28 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 if (obj.runtime.activeRequests.size >= config.execution.maxConcurrentScans) { break; }
                 dispatchScan(candidate.nodeId, candidate.meshId, candidate.mode, candidate.initiatedBy);
             }
+            await evaluateShutdownWaterfall(eligibleAgents);
         } finally {
             obj.runtime.evaluating = false;
         }
+    }
+
+    function requestScheduleEvaluation() {
+        evaluateSchedule().catch((error) => {
+            obj.meshServer.debug(
+                "plugin",
+                SHORT_NAME + ": scheduler crashed: " + (error && error.message ? error.message : String(error))
+            );
+        });
     }
 
     function scheduleEvaluator() {
         if (obj.runtime.schedulerTimer) {
             clearInterval(obj.runtime.schedulerTimer);
         }
-        obj.runtime.schedulerTimer = setInterval(evaluateSchedule, obj.runtime.config.schedule.evaluationIntervalSeconds * 1000);
+        obj.runtime.schedulerTimer = setInterval(function () {
+            requestScheduleEvaluation();
+        }, obj.runtime.config.schedule.evaluationIntervalSeconds * 1000);
     }
 
     function processStatusResult(state, payload) {
@@ -653,7 +926,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         exportTelemetryIfConfigured(state, mode).catch((error) => {
             obj.meshServer.debug("plugin", SHORT_NAME + ": Famous Recon export crashed: " + (error && error.message ? error.message : String(error)));
         });
-        evaluateSchedule();
+        requestScheduleEvaluation();
     }
 
     obj.onDeviceRefreshEnd = function () {
@@ -670,7 +943,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         reloadRuntimeConfig();
         queuePluginUpgradeFullScansForOnlineAgents();
         scheduleEvaluator();
-        evaluateSchedule();
+        requestScheduleEvaluation();
     };
 
     obj.hook_setupHttpHandlers = function () {
@@ -684,7 +957,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         if (isNodeInScope(agent.dbNodeKey, agent.dbMeshKey) && isLikelyWindowsAgent(agent) && needsPluginUpgradeFullScan(state)) {
             queueFullScan(state, "plugin-upgrade:" + getCurrentPluginVersion());
             saveState(agent.dbNodeKey, state);
-            evaluateSchedule();
+            requestScheduleEvaluation();
             return;
         }
         if (obj.runtime.config.schedule.enabled && obj.runtime.config.schedule.fullOnReconnect && isNodeInScope(agent.dbNodeKey, agent.dbMeshKey) && isLikelyWindowsAgent(agent)) {
@@ -695,6 +968,29 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     obj.serveraction = function (command, sourceObject) {
         if (command.pluginaction === "scanResult") {
             handleScanResult(command, sourceObject);
+            return;
+        }
+        if (command.pluginaction === "shutdownResult") {
+            const nodeId = sourceObject && sourceObject.dbNodeKey ? sourceObject.dbNodeKey : command.nodeId;
+            const meshId = sourceObject && sourceObject.dbMeshKey ? sourceObject.dbMeshKey : null;
+            if (!nodeId) { return; }
+            obj.runtime.activeShutdowns.delete(nodeId);
+            const state = loadState(nodeId, meshId);
+            state.shutdown.activeRequestId = null;
+            state.shutdown.activeSince = null;
+            state.shutdown.activeUntil = null;
+            if (command.status === "cancelled") {
+                state.shutdown.declinedDate = command.nightKey || state.shutdown.declinedDate;
+                markShutdownState(state, "cancelled", null);
+                emitNodeEvent(nodeId, meshId, "Nightly POS shutdown was cancelled on the device.", SHORT_NAME + "-shutdown");
+            } else {
+                markShutdownState(
+                    state,
+                    command.status || "error",
+                    command.error || null
+                );
+            }
+            saveState(nodeId, state);
         }
     };
 
@@ -764,7 +1060,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             };
             obj.persistence.saveConfig(obj.runtime.config);
             scheduleEvaluator();
-            evaluateSchedule();
+            requestScheduleEvaluation();
             res.json({ ok: true, message: "Configuration saved." });
             return;
         }

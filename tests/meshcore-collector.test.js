@@ -25,3 +25,8 @@ test("meshcore collector probes Click-to-Run Office root paths for activation da
     assert.match(script, /Microsoft Office\\root\\Office16\\OSPP\.VBS/);
     assert.match(script, /Microsoft Office\\root\\Office16\\vnextdiag\.ps1/);
 });
+
+test("meshcore collector exposes the native Windows shutdown binary for POS countdowns", () => {
+    const collector = require("../modules_meshcore/centralreconperipherals");
+    assert.match(collector.getShutdownPath(), /shutdown\.exe$/i);
+});

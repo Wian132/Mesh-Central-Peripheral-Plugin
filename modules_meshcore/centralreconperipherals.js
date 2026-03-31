@@ -2,6 +2,7 @@
 
 var mesh = null;
 var activeScan = null;
+var activeShutdown = null;
 
 function getPowerShellPath() {
     var winDir = process.env["WINDIR"] || process.env["windir"] || "C:\\Windows";
@@ -40,6 +41,87 @@ function sendResult(args, status, payload, error, warnings) {
         warnings: warnings || [],
         error: error || null
     });
+}
+
+function sendShutdownResult(args, status, error) {
+    mesh.SendCommand({
+        action: "plugin",
+        plugin: "centralreconperipherals",
+        pluginaction: "shutdownResult",
+        requestId: args.requestId,
+        slotKey: args.slotKey || null,
+        nightKey: args.nightKey || null,
+        status: status,
+        collectedAt: new Date().toISOString(),
+        error: error || null
+    });
+}
+
+function getShutdownPath() {
+    var winDir = process.env["WINDIR"] || process.env["windir"] || "C:\\Windows";
+    return winDir + "\\System32\\shutdown.exe";
+}
+
+function runShutdown(args) {
+    if (process.platform !== "win32") {
+        sendShutdownResult(args, "error", "Unsupported platform: " + process.platform);
+        return;
+    }
+
+    if (activeShutdown != null) {
+        sendShutdownResult(args, "error", "Shutdown worker is busy.");
+        return;
+    }
+
+    var countdownSec = Math.max(30, Number(args.countdownSec) || 300);
+    var shutdownAt = new Date(Date.now() + countdownSec * 1000).toLocaleTimeString();
+    var comment = "Scheduled nightly POS shutdown at " + shutdownAt + ". Run 'shutdown /a' to cancel.";
+    var child = null;
+    activeShutdown = {
+        requestId: args.requestId,
+        slotKey: args.slotKey || null,
+        timer: null
+    };
+
+    try {
+        child = require("child_process").execFile(
+            getShutdownPath(),
+            ["/s", "/t", String(countdownSec), "/c", comment],
+            function (error) {
+                if (error) {
+                    activeShutdown = null;
+                    sendShutdownResult(
+                        args,
+                        "error",
+                        "Unable to start shutdown countdown: " + (error && error.message ? error.message : String(error))
+                    );
+                    return;
+                }
+
+                activeShutdown.timer = setTimeout(function () {
+                    require("child_process").execFile(
+                        getShutdownPath(),
+                        ["/a"],
+                        function (abortError) {
+                            var current = activeShutdown;
+                            activeShutdown = null;
+                            if (current == null || current.requestId !== args.requestId) { return; }
+                            if (!abortError) {
+                                sendShutdownResult(args, "cancelled", null);
+                            }
+                        }
+                    );
+                }, (countdownSec * 1000) + 5000);
+            }
+        );
+    } catch (error) {
+        activeShutdown = null;
+        sendShutdownResult(
+            args,
+            "error",
+            "Unable to launch shutdown.exe: " + (error && error.message ? error.message : String(error))
+        );
+    }
 }
 
 function buildPowerShellScript(mode, outputPath) {
@@ -373,8 +455,14 @@ function runScan(args) {
 
 function consoleaction(args, rights, sessionid, parent) {
     mesh = parent;
-    if (!args || args.pluginaction !== "scan") { return; }
-    runScan(args);
+    if (!args) { return; }
+    if (args.pluginaction === "scan") {
+        runScan(args);
+        return;
+    }
+    if (args.pluginaction === "shutdown") {
+        runShutdown(args);
+    }
 }
 
 module.exports = {
@@ -382,5 +470,6 @@ module.exports = {
     consoleaction: consoleaction,
     buildScanPaths: buildScanPaths,
     getPowerShellArgs: getPowerShellArgs,
-    getPowerShellPath: getPowerShellPath
+    getPowerShellPath: getPowerShellPath,
+    getShutdownPath: getShutdownPath
 };
