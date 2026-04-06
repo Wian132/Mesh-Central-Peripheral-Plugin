@@ -633,7 +633,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
             const responseData = control.response.data || {};
             const shutdownState = responseData.shutdown_state || null;
-            if (!shutdownState || shutdownState.device_type !== "pos") {
+            if (!shutdownState) {
                 saveState(agent.dbNodeKey, state);
                 continue;
             }

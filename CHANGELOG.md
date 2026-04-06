@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.25
+
+- Removed the POS-only device type gate from the shutdown waterfall so both POS and Other devices can participate in nightly shutdown orchestration, controlled entirely by the backend's `participates_in_waterfall` flag.
+
 ## 0.1.24
 
 - Restructured the Famous Recon admin panel section into clear Telemetry Export and Fleet Control sub-sections, replacing the misleading "Legacy" labels with "Fleet endpoint URL" and "Fleet API key" so the shutdown orchestration fields are no longer mistaken for deprecated options.
