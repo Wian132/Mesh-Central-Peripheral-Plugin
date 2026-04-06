@@ -1005,6 +1005,50 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             return;
         }
 
+        if (req.query.api === "shutdown-debug") {
+            if (!isFullSiteAdmin(user)) { res.sendStatus(401); return; }
+            setNoCacheHeaders(res);
+            const allStates = obj.persistence.listAllStates();
+            const devices = [];
+            for (const entry of allStates) {
+                const s = entry.state;
+                const os = s.fullSnapshot && s.fullSnapshot.systemSummary && s.fullSnapshot.systemSummary.operatingSystem
+                    ? s.fullSnapshot.systemSummary.operatingSystem : {};
+                const sh = s.shutdown || {};
+                const cached = obj.runtime.shutdownControlCache.get(entry.nodeId);
+                devices.push({
+                    computerName: os.computerName || null,
+                    nodeId: entry.nodeId,
+                    meshId: s.meshId || null,
+                    lastStatusScanAt: s.lastStatusScanAt || null,
+                    lastFullScanAt: s.lastFullScanAt || null,
+                    shutdown: {
+                        lastAttemptedSlotKey: sh.lastAttemptedSlotKey || null,
+                        declinedDate: sh.declinedDate || null,
+                        lastResultStatus: sh.lastResultStatus || null,
+                        lastResultAt: sh.lastResultAt || null,
+                        lastError: sh.lastError || null,
+                        activeRequestId: sh.activeRequestId || null
+                    },
+                    hasCachedControl: Boolean(cached),
+                    cachedControlAge: cached ? nowMs() - cached.fetchedAt : null
+                });
+            }
+            devices.sort((a, b) => String(a.computerName || "").localeCompare(String(b.computerName || "")));
+            const fr = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
+                ? obj.runtime.config.integrations.famousRecon : {};
+            res.json({
+                configHealth: {
+                    enabled: fr.enabled === true,
+                    hasEndpointUrl: Boolean(String(fr.endpointUrl || "").trim()),
+                    hasApiKey: Boolean(String(fr.apiKey || "").trim()),
+                    hasSupabaseUrl: Boolean(String(fr.supabaseUrl || "").trim())
+                },
+                devices
+            });
+            return;
+        }
+
         if (req.query.api === "device-state") {
             const access = await getNodeAccess(user, req.query.nodeid);
             if (!access) { res.sendStatus(401); return; }

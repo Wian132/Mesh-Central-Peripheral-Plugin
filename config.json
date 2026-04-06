@@ -1,7 +1,7 @@
 {
   "name": "CentralRecon Peripherals",
   "shortName": "centralreconperipherals",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "author": "Wian Otto",
   "description": "Windows peripheral telemetry for MeshCentral devices with scheduled status scans and full inventory snapshots.",
   "hasAdminPanel": true,

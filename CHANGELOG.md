@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.24
+
+- Restructured the Famous Recon admin panel section into clear Telemetry Export and Fleet Control sub-sections, replacing the misleading "Legacy" labels with "Fleet endpoint URL" and "Fleet API key" so the shutdown orchestration fields are no longer mistaken for deprecated options.
+- Added a Shutdown Debug panel to the admin page with on-demand loading, config health badges, per-device status table with color-coded results, and summary counts for quick fleet-wide shutdown diagnostics without SSH.
+
 ## 0.1.23
 
 - Added Office activation diagnostic telemetry fields for richer Admin troubleshooting: license description, error code, and error description.
