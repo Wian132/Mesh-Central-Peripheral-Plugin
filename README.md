@@ -190,7 +190,7 @@ Optional CentralRecon dashboard export:
 - legacy HTTP export retries once without `healthSignals` if an older endpoint rejects that field
 - direct Supabase export retries once without unsupported plugin/health columns if the target schema has not been migrated yet
 
-Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
+Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. As of `0.2.1`, plugin startup also writes a one-line summary to the MeshCentral service output with the plugin version plus FamousRecon config health (`enabled`, `supabase`, `endpoint`) so restarts are easier to verify from `journalctl`. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
 
 ## Testing
 

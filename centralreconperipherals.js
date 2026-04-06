@@ -207,6 +207,25 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         return String(pluginMetadata.version || "");
     }
 
+    function logStartupSummary() {
+        const famousRecon = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
+            ? obj.runtime.config.integrations.famousRecon
+            : {};
+        const scope = obj.runtime.config.scope || {};
+        const scopedMeshes = Array.isArray(scope.meshIds) ? scope.meshIds.length : 0;
+        const scopedNodes = Array.isArray(scope.nodeIds) ? scope.nodeIds.length : 0;
+        console.log(
+            SHORT_NAME +
+            ": startup" +
+            " version=" + getCurrentPluginVersion() +
+            " famousRecon=" + (famousRecon.enabled === true ? "enabled" : "disabled") +
+            " supabase=" + (String(famousRecon.supabaseUrl || "").trim() ? "set" : "missing") +
+            " endpoint=" + (String(famousRecon.endpointUrl || "").trim() ? "set" : "missing") +
+            " scopedMeshes=" + scopedMeshes +
+            " scopedNodes=" + scopedNodes
+        );
+    }
+
     function needsPluginUpgradeFullScan(state) {
         return String(state && state.lastPluginVersionApplied || "") !== getCurrentPluginVersion();
     }
@@ -941,6 +960,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     obj.server_startup = function () {
         reloadRuntimeConfig();
+        logStartupSummary();
         queuePluginUpgradeFullScansForOnlineAgents();
         scheduleEvaluator();
         requestScheduleEvaluation();

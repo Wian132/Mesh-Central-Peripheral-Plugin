@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Aligned the shipped package metadata with the published plugin manifest so installs and local tooling now report the same plugin version.
+- Added a visible startup summary line to MeshCentral server output showing the plugin version plus FamousRecon config health, making restart verification easier even when historical `mesherrors.txt` entries are stale.
+
 ## 0.1.25
 
 - Removed the POS-only device type gate from the shutdown waterfall so both POS and Other devices can participate in nightly shutdown orchestration, controlled entirely by the backend's `participates_in_waterfall` flag.

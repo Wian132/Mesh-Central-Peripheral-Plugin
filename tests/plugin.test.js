@@ -230,3 +230,57 @@ test("server startup skips upgrade refresh when the current plugin version was a
 
     assert.equal(sent.length, 0);
 });
+
+test("server startup writes a visible startup summary with FamousRecon config health", () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-startup-log-"));
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (...args) => { logs.push(args.join(" ")); };
+
+    try {
+        const instance = pluginFactory({
+            parent: {
+                datapath,
+                config: { domains: { "": { id: "" } } },
+                webserver: {
+                    wsagents: {},
+                    meshes: {},
+                    CreateNodeDispatchTargets() { return []; },
+                    GetNodeWithRights(domain, user, nodeId, callback) { callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true); }
+                },
+                DispatchEvent() {},
+                debug() {}
+            },
+            registerPluginTab() {}
+        });
+
+        instance.persistence.saveConfig({
+            integrations: {
+                famousRecon: {
+                    enabled: true,
+                    supabaseUrl: "https://example.supabase.co",
+                    supabaseAnonKey: "anon-key",
+                    endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
+                    apiKey: "fok_test_key",
+                    exportOnStatusScans: true,
+                    exportOnFullScans: true
+                }
+            }
+        });
+
+        instance.server_startup();
+        clearInterval(instance.runtime.schedulerTimer);
+
+        assert.ok(
+            logs.some((line) =>
+                line.includes("centralreconperipherals: startup") &&
+                line.includes(`version=${pluginMetadata.version}`) &&
+                line.includes("famousRecon=enabled") &&
+                line.includes("supabase=set") &&
+                line.includes("endpoint=set")
+            )
+        );
+    } finally {
+        console.log = originalConsoleLog;
+    }
+});
