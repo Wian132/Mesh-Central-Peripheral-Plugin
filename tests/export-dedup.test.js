@@ -153,11 +153,12 @@ test("handleScanResult with unchanged status hash skips export", async (t) => {
     }
 });
 
-test("state fields lastExportedStatusHash and lastExportedFullHash persist through save/load", () => {
+test("state fields lastExportedStatusHash, lastExportedFullHash, and lastExportedAt persist through save/load", () => {
     const { instance } = buildTestInstance();
     clearInterval(instance.runtime.schedulerTimer);
 
     const nodeId = "node//test/persist-hash";
+    const exportedAt = Date.now() - 5000;
     instance.persistence.saveState(nodeId, {
         schemaVersion: 1,
         nodeId,
@@ -165,6 +166,7 @@ test("state fields lastExportedStatusHash and lastExportedFullHash persist throu
         domainId: "test",
         lastExportedStatusHash: "status-hash-abc",
         lastExportedFullHash: "full-hash-def",
+        lastExportedAt: exportedAt,
         scheduler: {},
         events: {},
         shutdown: {}
@@ -173,4 +175,5 @@ test("state fields lastExportedStatusHash and lastExportedFullHash persist throu
     const loaded = instance.persistence.loadState(nodeId, () => ({}));
     assert.equal(loaded.lastExportedStatusHash, "status-hash-abc");
     assert.equal(loaded.lastExportedFullHash, "full-hash-def");
+    assert.equal(loaded.lastExportedAt, exportedAt);
 });

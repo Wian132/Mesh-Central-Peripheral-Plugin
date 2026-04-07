@@ -87,6 +87,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             lastError: null,
             lastExportedStatusHash: null,
             lastExportedFullHash: null,
+            lastExportedAt: null,
             scheduler: {
                 queuedFull: false,
                 queuedFullReason: null,
@@ -841,9 +842,17 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         return mode === "status" ? (state.lastExportedStatusHash || null) : (state.lastExportedFullHash || null);
     }
 
+    const DEDUP_FORCE_EXPORT_MS = 15 * 60 * 1000;
+
     function markExportedHash(state, mode, hash) {
         if (mode === "status") { state.lastExportedStatusHash = hash; }
         else { state.lastExportedFullHash = hash; }
+        state.lastExportedAt = nowMs();
+    }
+
+    function isForceExportDue(state) {
+        if (typeof state.lastExportedAt !== "number") { return true; }
+        return (nowMs() - state.lastExportedAt) >= DEDUP_FORCE_EXPORT_MS;
     }
 
     async function exportTelemetryIfConfigured(state, mode) {
@@ -865,7 +874,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
         const currentHash = getCurrentExportHash(state, mode);
         const lastHash = getLastExportedHash(state, mode);
-        if (currentHash && lastHash && currentHash === lastHash) {
+        if (currentHash && lastHash && currentHash === lastHash && !isForceExportDue(state)) {
             logFamousReconDebug("Famous Recon export skipped: " + mode + " hash unchanged (" + currentHash.slice(0, 12) + "…).");
             return;
         }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Fixed stale dashboard issue caused by hash dedup: the plugin now forces a telemetry export at least once every 15 minutes even when the scan hash is unchanged, keeping the dashboard freshness indicators accurate while still eliminating the vast majority of redundant writes within each 15-minute window.
+
 ## 0.3.0
 
 - Added hash-based export deduplication: the plugin now tracks the last exported status and full inventory hashes per device and skips the FamousRecon/Supabase export when telemetry is unchanged, eliminating ~90% of redundant database writes from status scans.
