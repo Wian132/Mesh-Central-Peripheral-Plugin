@@ -6,12 +6,15 @@ const assert = require("node:assert/strict");
 const {
     buildExportAttemptLogLine,
     buildSupabaseRow,
+    clearServerIdCache,
     deriveAgentConfigUrl,
     fetchFleetDeviceConfig,
+    getCachedServerId,
     maskApiKeyForLog,
     resolveServerId,
     sendTelemetry,
     sendTelemetryToSupabase,
+    setCachedServerId,
     truncateForLog
 } = require("../lib/famous-recon");
 
@@ -305,6 +308,7 @@ test("sendTelemetryToSupabase returns error when supabaseUrl is missing", async 
 });
 
 test("sendTelemetryToSupabase happy path resolves + inserts", async () => {
+    clearServerIdCache();
     const originalFetch = global.fetch;
     const calls = [];
     global.fetch = async (url, opts) => {
@@ -326,10 +330,12 @@ test("sendTelemetryToSupabase happy path resolves + inserts", async () => {
         assert.equal(calls[1].method, "POST");
     } finally {
         global.fetch = originalFetch;
+        clearServerIdCache();
     }
 });
 
 test("sendTelemetryToSupabase retries without unsupported plugin health columns", async () => {
+    clearServerIdCache();
     const originalFetch = global.fetch;
     const posts = [];
     global.fetch = async (url, opts) => {
@@ -391,6 +397,7 @@ test("sendTelemetryToSupabase retries without unsupported plugin health columns"
 });
 
 test("sendTelemetryToSupabase propagates insert error", async () => {
+    clearServerIdCache();
     const originalFetch = global.fetch;
     global.fetch = async (url, opts) => {
         if (opts.method === "GET") {
@@ -412,6 +419,7 @@ test("sendTelemetryToSupabase propagates insert error", async () => {
 });
 
 test("sendTelemetryToSupabase propagates server lookup failure", async () => {
+    clearServerIdCache();
     const originalFetch = global.fetch;
     global.fetch = async () => ({ ok: false, status: 500, text: async () => "internal error" });
     try {
@@ -423,5 +431,73 @@ test("sendTelemetryToSupabase propagates server lookup failure", async () => {
         assert.match(result.error, /fleet_servers lookup failed/);
     } finally {
         global.fetch = originalFetch;
+    }
+});
+
+// --- serverIdCache tests ---
+
+test("serverIdCache: getCachedServerId returns null for unknown nodeId", () => {
+    clearServerIdCache();
+    assert.equal(getCachedServerId("node//unknown"), null);
+});
+
+test("serverIdCache: setCachedServerId populates the cache and getCachedServerId retrieves it", () => {
+    clearServerIdCache();
+    setCachedServerId("node//test/dev1", "srv-uuid-1");
+    assert.equal(getCachedServerId("node//test/dev1"), "srv-uuid-1");
+    assert.equal(getCachedServerId("node//test/dev2"), null);
+});
+
+test("serverIdCache: clearServerIdCache empties the cache", () => {
+    setCachedServerId("node//test/devA", "srv-A");
+    setCachedServerId("node//test/devB", "srv-B");
+    clearServerIdCache();
+    assert.equal(getCachedServerId("node//test/devA"), null);
+    assert.equal(getCachedServerId("node//test/devB"), null);
+});
+
+test("sendTelemetryToSupabase skips resolveServerId when serverId is cached", async () => {
+    clearServerIdCache();
+    setCachedServerId("node//test/cached-dev", "srv-cached");
+    const originalFetch = global.fetch;
+    const calls = [];
+    global.fetch = async (url, opts) => {
+        calls.push({ url, method: opts.method });
+        return { ok: true, status: 201, text: async () => "" };
+    };
+    try {
+        const result = await sendTelemetryToSupabase(
+            { enabled: true, supabaseUrl: "https://proj.supabase.co", supabaseAnonKey: "anon-key", requestTimeoutMs: 5000 },
+            { nodeId: "node//test/cached-dev", reportedAt: "2026-04-07T00:00:00Z", metrics: {}, printers: [], peripherals: [], paymentTerminalCandidates: [] }
+        );
+        assert.equal(result.ok, true);
+        assert.equal(result.serverId, "srv-cached");
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].method, "POST");
+    } finally {
+        global.fetch = originalFetch;
+        clearServerIdCache();
+    }
+});
+
+test("sendTelemetryToSupabase populates serverIdCache after first resolution", async () => {
+    clearServerIdCache();
+    const originalFetch = global.fetch;
+    global.fetch = async (url, opts) => {
+        if (opts.method === "GET") {
+            return { ok: true, json: async () => [{ id: "srv-new" }] };
+        }
+        return { ok: true, status: 201, text: async () => "" };
+    };
+    try {
+        assert.equal(getCachedServerId("node//test/new-dev"), null);
+        await sendTelemetryToSupabase(
+            { enabled: true, supabaseUrl: "https://proj.supabase.co", supabaseAnonKey: "anon-key", requestTimeoutMs: 5000 },
+            { nodeId: "node//test/new-dev", reportedAt: "2026-04-07T00:00:00Z", metrics: {}, printers: [], peripherals: [], paymentTerminalCandidates: [] }
+        );
+        assert.equal(getCachedServerId("node//test/new-dev"), "srv-new");
+    } finally {
+        global.fetch = originalFetch;
+        clearServerIdCache();
     }
 });

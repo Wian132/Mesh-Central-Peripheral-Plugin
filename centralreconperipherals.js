@@ -85,6 +85,8 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             diff: null,
             changedSincePrevious: false,
             lastError: null,
+            lastExportedStatusHash: null,
+            lastExportedFullHash: null,
             scheduler: {
                 queuedFull: false,
                 queuedFullReason: null,
@@ -830,6 +832,20 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         obj.meshServer.debug("plugin", SHORT_NAME + ": " + message);
     }
 
+    function getCurrentExportHash(state, mode) {
+        if (mode === "status") { return state.statusHash || null; }
+        return state.fullSnapshot && state.fullSnapshot.snapshotHash ? state.fullSnapshot.snapshotHash : null;
+    }
+
+    function getLastExportedHash(state, mode) {
+        return mode === "status" ? (state.lastExportedStatusHash || null) : (state.lastExportedFullHash || null);
+    }
+
+    function markExportedHash(state, mode, hash) {
+        if (mode === "status") { state.lastExportedStatusHash = hash; }
+        else { state.lastExportedFullHash = hash; }
+    }
+
     async function exportTelemetryIfConfigured(state, mode) {
         const integration = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
             ? obj.runtime.config.integrations.famousRecon
@@ -844,6 +860,13 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         }
         if (mode === "full" && integration.exportOnFullScans !== true) {
             logFamousReconDebug("Famous Recon export skipped: exportOnFullScans is false (scan mode=full).");
+            return;
+        }
+
+        const currentHash = getCurrentExportHash(state, mode);
+        const lastHash = getLastExportedHash(state, mode);
+        if (currentHash && lastHash && currentHash === lastHash) {
+            logFamousReconDebug("Famous Recon export skipped: " + mode + " hash unchanged (" + currentHash.slice(0, 12) + "…).");
             return;
         }
 
@@ -880,6 +903,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 return;
             }
             if (result.ok) {
+                if (currentHash) { markExportedHash(state, mode, currentHash); saveState(state.nodeId, state); }
                 logFamousReconDebug("Supabase export ok: deviceId=" + deviceId + " serverId=" + (result.serverId || "n/a") + " httpStatus=" + (result.status != null ? result.status : "n/a"));
                 return;
             }
@@ -895,6 +919,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             return;
         }
         if (result.ok) {
+            if (currentHash) { markExportedHash(state, mode, currentHash); saveState(state.nodeId, state); }
             logFamousReconDebug("Famous Recon export ok: deviceId=" + deviceId + " httpStatus=" + (result.status != null ? result.status : "n/a"));
             return;
         }

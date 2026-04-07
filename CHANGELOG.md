@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Added hash-based export deduplication: the plugin now tracks the last exported status and full inventory hashes per device and skips the FamousRecon/Supabase export when telemetry is unchanged, eliminating ~90% of redundant database writes from status scans.
+- Added in-process serverId caching for the Supabase direct export path so the `fleet_servers` lookup query runs once per device instead of on every export, cutting Supabase-path database operations nearly in half.
+- Increased the default status scan interval from 1 minute to 5 minutes for new installations. Existing configs with an explicitly saved interval are not affected; update manually via the admin panel if desired.
+- Combined estimated impact: ~8-25x reduction in database operations from the plugin for a typical 40-device fleet.
+
 ## 0.2.1
 
 - Aligned the shipped package metadata with the published plugin manifest so installs and local tooling now report the same plugin version.

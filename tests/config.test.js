@@ -8,7 +8,7 @@ const { cloneDefaultConfig, migrateConfig, sanitizeConfig } = require("../lib/co
 test("default config enables scheduled scans with the planned cadence and concurrency", () => {
     const config = cloneDefaultConfig();
     assert.equal(config.schedule.enabled, true);
-    assert.equal(config.schedule.statusIntervalMinutes, 1);
+    assert.equal(config.schedule.statusIntervalMinutes, 5);
     assert.equal(config.schedule.fullIntervalMinutes, 15);
     assert.equal(config.execution.maxConcurrentScans, 3);
     assert.equal(config.schedule.advancedOneMinuteFullInventory, false);
