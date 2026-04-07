@@ -262,6 +262,7 @@ test("server startup writes a visible startup summary with FamousRecon config he
                     supabaseAnonKey: "anon-key",
                     endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
                     apiKey: "fok_test_key",
+                    forceShutdownAppsClosed: true,
                     exportOnStatusScans: true,
                     exportOnFullScans: true
                 }
@@ -277,7 +278,8 @@ test("server startup writes a visible startup summary with FamousRecon config he
                 line.includes(`version=${pluginMetadata.version}`) &&
                 line.includes("famousRecon=enabled") &&
                 line.includes("supabase=set") &&
-                line.includes("endpoint=set")
+                line.includes("endpoint=set") &&
+                line.includes("shutdownForceClose=enabled")
             )
         );
     } finally {

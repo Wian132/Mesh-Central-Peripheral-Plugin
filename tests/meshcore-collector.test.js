@@ -31,6 +31,15 @@ test("meshcore collector exposes the native Windows shutdown binary for POS coun
     assert.match(collector.getShutdownPath(), /shutdown\.exe$/i);
 });
 
+test("meshcore collector builds a PowerShell shutdown wrapper that can opt into /f", () => {
+    const collector = require("../modules_meshcore/centralreconperipherals");
+    const command = collector.buildShutdownPowerShellCommand(300, "Run 'shutdown /a' to cancel.", true);
+
+    assert.match(command, /\$shutdownPath = '.*shutdown\.exe'/i);
+    assert.match(command, /'\/f'/);
+    assert.match(command, /\$LASTEXITCODE/);
+});
+
 test("meshcore collector includes exit diagnostics when shutdown.exe fails", () => {
     const collector = require("../modules_meshcore/centralreconperipherals");
     const message = collector.formatExecFileError(

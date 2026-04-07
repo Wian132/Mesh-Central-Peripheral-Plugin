@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- Added an explicit `forceShutdownAppsClosed` Famous Recon option in the MeshCentral admin panel. It stays off by default and only adds Windows `/f` during backend-approved shutdown slots, so it cannot bypass shutdown windows or trading-hour protections.
+- Switched the meshcore shutdown launcher to a PowerShell wrapper that captures `shutdown.exe` output more reliably, improving diagnostics on devices that still reject the countdown before it starts.
+- Startup logs now include whether forced shutdown mode is enabled, making live deploy verification easier.
+
 ## 0.3.2
 
 - Improved POS shutdown failure diagnostics from the meshcore module: when `shutdown.exe` exits non-zero, the plugin now records the exit code plus any stdout/stderr returned by Windows instead of the opaque `Unable to start shutdown countdown: 1` message.

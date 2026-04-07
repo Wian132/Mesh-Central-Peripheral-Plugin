@@ -224,6 +224,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             " famousRecon=" + (famousRecon.enabled === true ? "enabled" : "disabled") +
             " supabase=" + (String(famousRecon.supabaseUrl || "").trim() ? "set" : "missing") +
             " endpoint=" + (String(famousRecon.endpointUrl || "").trim() ? "set" : "missing") +
+            " shutdownForceClose=" + (famousRecon.forceShutdownAppsClosed === true ? "enabled" : "disabled") +
             " scopedMeshes=" + scopedMeshes +
             " scopedNodes=" + scopedNodes
         );
@@ -404,6 +405,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const state = loadState(nodeId, meshId);
         const webserver = getWebServer();
         const now = nowMs();
+        const integration = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
+            ? obj.runtime.config.integrations.famousRecon
+            : {};
 
         if (!options || !options.slotKey) {
             return { ok: false, message: "Missing shutdown slot key." };
@@ -421,6 +425,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         }
 
         const countdownSec = Math.max(30, Number(options.countdownSec) || 300);
+        const forceAppsClosed = integration.forceShutdownAppsClosed === true;
         const requestId = createHashHex([nodeId, meshId, "shutdown", options.slotKey, now]).slice(0, 24);
 
         state.shutdown.activeRequestId = requestId;
@@ -449,12 +454,13 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 requestId,
                 slotKey: options.slotKey,
                 nightKey: options.nightKey || null,
-                countdownSec
+                countdownSec,
+                forceAppsClosed
             }));
             emitNodeEvent(
                 nodeId,
                 meshId,
-                "Nightly POS shutdown countdown dispatched (" + countdownSec + "s).",
+                "Nightly POS shutdown countdown dispatched (" + countdownSec + "s" + (forceAppsClosed ? ", force-close apps" : "") + ").",
                 SHORT_NAME + "-shutdown"
             );
             return { ok: true, message: "Nightly POS shutdown dispatched." };

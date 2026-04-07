@@ -100,3 +100,16 @@ test("famous recon device type accepts admin", () => {
     assert.deepEqual(result.errors, []);
     assert.equal(result.config.integrations.famousRecon.deviceType, "admin");
 });
+
+test("famous recon config preserves opt-in forced shutdown setting", () => {
+    const result = sanitizeConfig({
+        integrations: {
+            famousRecon: {
+                forceShutdownAppsClosed: true
+            }
+        }
+    });
+
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.config.integrations.famousRecon.forceShutdownAppsClosed, true);
+});

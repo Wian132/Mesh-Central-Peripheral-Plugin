@@ -94,6 +94,35 @@ function formatExecFileError(prefix, error, stdout, stderr) {
     return details.length > 0 ? (prefix + ": " + details.join(" | ")) : prefix;
 }
 
+function escapePowerShellSingleQuoted(value) {
+    return String(value == null ? "" : value).replace(/'/g, "''");
+}
+
+function buildShutdownPowerShellCommand(countdownSec, comment, forceAppsClosed) {
+    var args = [
+        "'/s'",
+        "'/t'",
+        "'" + String(countdownSec) + "'",
+        "'/c'",
+        "'" + escapePowerShellSingleQuoted(comment) + "'"
+    ];
+
+    if (forceAppsClosed === true) {
+        args.push("'/f'");
+    }
+
+    return [
+        "$ErrorActionPreference = 'Stop'",
+        "$shutdownPath = '" + escapePowerShellSingleQuoted(getShutdownPath()) + "'",
+        "$arguments = @(" + args.join(", ") + ")",
+        "$output = & $shutdownPath @arguments 2>&1 | Out-String",
+        "$exitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }",
+        "$trimmed = $output.Trim()",
+        "if ($trimmed.Length -gt 0) { [Console]::Out.Write($trimmed) }",
+        "exit $exitCode"
+    ].join("; ");
+}
+
 function runShutdown(args) {
     if (process.platform !== "win32") {
         sendShutdownResult(args, "error", "Unsupported platform: " + process.platform);
@@ -106,6 +135,7 @@ function runShutdown(args) {
     }
 
     var countdownSec = Math.max(30, Number(args.countdownSec) || 300);
+    var forceAppsClosed = args.forceAppsClosed === true;
     var shutdownAt = new Date(Date.now() + countdownSec * 1000).toLocaleTimeString();
     var comment = "Scheduled nightly POS shutdown at " + shutdownAt + ". Run 'shutdown /a' to cancel.";
     var child = null;
@@ -117,8 +147,8 @@ function runShutdown(args) {
 
     try {
         child = require("child_process").execFile(
-            getShutdownPath(),
-            ["/s", "/t", String(countdownSec), "/c", comment],
+            getPowerShellPath(),
+            getPowerShellArgs().concat(["-Command", buildShutdownPowerShellCommand(countdownSec, comment, forceAppsClosed)]),
             function (error, stdout, stderr) {
                 if (error) {
                     activeShutdown = null;
@@ -499,8 +529,10 @@ function consoleaction(args, rights, sessionid, parent) {
 
 module.exports = {
     buildPowerShellScript: buildPowerShellScript,
+    buildShutdownPowerShellCommand: buildShutdownPowerShellCommand,
     consoleaction: consoleaction,
     buildScanPaths: buildScanPaths,
+    escapePowerShellSingleQuoted: escapePowerShellSingleQuoted,
     formatExecFileError: formatExecFileError,
     getPowerShellArgs: getPowerShellArgs,
     getPowerShellPath: getPowerShellPath,

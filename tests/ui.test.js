@@ -30,5 +30,8 @@ test("admin page renders admin as a valid Famous Recon device type option", () =
 
     assert.match(html, /<option value="admin"/);
     assert.match(html, />Admin<\/option>/);
+    assert.match(html, /name="forceShutdownAppsClosed"/);
+    assert.match(html, /Force-close apps during backend-approved shutdowns/);
     assert.match(html, /deviceType:\s*form\.famousReconDeviceType\.value\.trim\(\)/);
+    assert.match(html, /forceShutdownAppsClosed:\s*form\.forceShutdownAppsClosed\.checked/);
 });
