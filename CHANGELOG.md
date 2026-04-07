@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Improved POS shutdown failure diagnostics from the meshcore module: when `shutdown.exe` exits non-zero, the plugin now records the exit code plus any stdout/stderr returned by Windows instead of the opaque `Unable to start shutdown countdown: 1` message.
+- Added regression coverage for the new shutdown error formatting so future plugin releases keep surfacing actionable device-side shutdown failures.
+
 ## 0.3.1
 
 - Fixed stale dashboard issue caused by hash dedup: the plugin now forces a telemetry export at least once every 15 minutes even when the scan hash is unchanged, keeping the dashboard freshness indicators accurate while still eliminating the vast majority of redundant writes within each 15-minute window.

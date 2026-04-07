@@ -30,3 +30,18 @@ test("meshcore collector exposes the native Windows shutdown binary for POS coun
     const collector = require("../modules_meshcore/centralreconperipherals");
     assert.match(collector.getShutdownPath(), /shutdown\.exe$/i);
 });
+
+test("meshcore collector includes exit diagnostics when shutdown.exe fails", () => {
+    const collector = require("../modules_meshcore/centralreconperipherals");
+    const message = collector.formatExecFileError(
+        "Unable to start shutdown countdown",
+        { code: 1, signal: null, message: "1" },
+        "Access is denied.\r\nClose open applications first.\r\n",
+        ""
+    );
+
+    assert.equal(
+        message,
+        "Unable to start shutdown countdown: exit code 1 | stdout=Access is denied. Close open applications first."
+    );
+});

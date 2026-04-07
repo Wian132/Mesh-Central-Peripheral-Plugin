@@ -62,6 +62,38 @@ function getShutdownPath() {
     return winDir + "\\System32\\shutdown.exe";
 }
 
+function normalizeExecText(value) {
+    if (value == null) { return ""; }
+    return String(value).replace(/\s+/g, " ").trim();
+}
+
+function formatExecFileError(prefix, error, stdout, stderr) {
+    var details = [];
+    var message = normalizeExecText(error && error.message ? error.message : error);
+    var code = error && error.code != null ? String(error.code) : "";
+    var signal = error && error.signal ? String(error.signal) : "";
+    var stdoutText = normalizeExecText(stdout);
+    var stderrText = normalizeExecText(stderr);
+
+    if (message !== "" && message !== code) {
+        details.push(message);
+    }
+    if (code !== "") {
+        details.push("exit code " + code);
+    }
+    if (signal !== "") {
+        details.push("signal " + signal);
+    }
+    if (stdoutText !== "") {
+        details.push("stdout=" + stdoutText);
+    }
+    if (stderrText !== "") {
+        details.push("stderr=" + stderrText);
+    }
+
+    return details.length > 0 ? (prefix + ": " + details.join(" | ")) : prefix;
+}
+
 function runShutdown(args) {
     if (process.platform !== "win32") {
         sendShutdownResult(args, "error", "Unsupported platform: " + process.platform);
@@ -87,13 +119,13 @@ function runShutdown(args) {
         child = require("child_process").execFile(
             getShutdownPath(),
             ["/s", "/t", String(countdownSec), "/c", comment],
-            function (error) {
+            function (error, stdout, stderr) {
                 if (error) {
                     activeShutdown = null;
                     sendShutdownResult(
                         args,
                         "error",
-                        "Unable to start shutdown countdown: " + (error && error.message ? error.message : String(error))
+                        formatExecFileError("Unable to start shutdown countdown", error, stdout, stderr)
                     );
                     return;
                 }
@@ -469,6 +501,7 @@ module.exports = {
     buildPowerShellScript: buildPowerShellScript,
     consoleaction: consoleaction,
     buildScanPaths: buildScanPaths,
+    formatExecFileError: formatExecFileError,
     getPowerShellArgs: getPowerShellArgs,
     getPowerShellPath: getPowerShellPath,
     getShutdownPath: getShutdownPath
