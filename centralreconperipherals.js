@@ -680,12 +680,14 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 saveState(agent.dbNodeKey, state);
                 continue;
             }
-            if (state.shutdown.lastAttemptedSlotKey === shutdownState.current_slot_key) {
+            const sameSlotAlreadyAttempted = state.shutdown.lastAttemptedSlotKey === shutdownState.current_slot_key;
+            const sameSlotRetryable =
+                sameSlotAlreadyAttempted &&
+                (state.shutdown.lastResultStatus === "blocked" || state.shutdown.lastResultStatus === "control_error");
+            if (sameSlotAlreadyAttempted && !sameSlotRetryable) {
                 saveState(agent.dbNodeKey, state);
                 continue;
             }
-
-            state.shutdown.lastAttemptedSlotKey = shutdownState.current_slot_key;
 
             if (shutdownState.shutdown_allowed !== true) {
                 markShutdownState(

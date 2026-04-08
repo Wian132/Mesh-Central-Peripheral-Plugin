@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Fixed a shutdown waterfall retry bug where a device marked `blocked` at the start of a slot would never be re-checked again during that same slot, even after linked POS devices or prerequisites became ready a minute later.
+- Added regression coverage to ensure blocked same-slot devices can retry and dispatch once the backend approves shutdown.
+
 ## 0.3.3
 
 - Added an explicit `forceShutdownAppsClosed` Famous Recon option in the MeshCentral admin panel. It stays off by default and only adds Windows `/f` during backend-approved shutdown slots, so it cannot bypass shutdown windows or trading-hour protections.

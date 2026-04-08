@@ -160,6 +160,7 @@ test("server startup migrates legacy scoped configs to enable scheduled scans", 
 test("server startup skips upgrade refresh when the current plugin version was already applied", () => {
     const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-current-"));
     const sent = [];
+    const now = Date.now();
     const parent = {
         datapath,
         config: { domains: { "": { id: "" } } },
@@ -197,13 +198,26 @@ test("server startup skips upgrade refresh when the current plugin version was a
         meshId: "mesh//test",
         domainId: "test",
         lastPluginVersionApplied: pluginMetadata.version,
-        statusSnapshot: null,
-        statusHash: null,
-        lastStatusScanAt: null,
-        lastFullScanAt: null,
+        statusSnapshot: {
+            snapshotHash: "status-hash",
+            systemSummary: { operatingSystem: { computerName: "DEVICE1" } },
+            printers: [],
+            paymentTerminalCandidates: [],
+            warnings: []
+        },
+        statusHash: "status-hash",
+        lastStatusScanAt: now,
+        lastFullScanAt: now,
         lastStatusResult: null,
         lastFullResult: null,
-        fullSnapshot: null,
+        fullSnapshot: {
+            snapshotHash: "full-hash",
+            systemSummary: { operatingSystem: { computerName: "DEVICE1" } },
+            peripherals: [],
+            printers: [],
+            paymentTerminalCandidates: [],
+            warnings: []
+        },
         previousFullSnapshot: null,
         rawFullPayload: null,
         previousRawFullPayload: null,
@@ -215,8 +229,8 @@ test("server startup skips upgrade refresh when the current plugin version was a
             queuedFullReason: null,
             runningMode: null,
             runningSince: null,
-            nextStatusScanAt: null,
-            nextFullScanAt: null,
+            nextStatusScanAt: now + 60_000,
+            nextFullScanAt: now + 60_000,
             unsupportedUntil: null
         },
         events: {
@@ -284,5 +298,149 @@ test("server startup writes a visible startup summary with FamousRecon config he
         );
     } finally {
         console.log = originalConsoleLog;
+    }
+});
+
+test("blocked same-slot shutdown states are retried when control later allows shutdown", async () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-shutdown-retry-"));
+    const sent = [];
+    const now = Date.now();
+    const originalFetch = global.fetch;
+
+    global.fetch = async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+            return {
+                config: { shutdown_countdown_sec: 300 },
+                shutdown_state: {
+                    participates_in_waterfall: true,
+                    slot_due_now: true,
+                    current_slot_key: "2026-04-08:02:00:00",
+                    current_date_local: "2026-04-08",
+                    shutdown_allowed: true
+                }
+            };
+        }
+    });
+
+    try {
+        const instance = pluginFactory({
+            parent: {
+                datapath,
+                config: { domains: { "": { id: "" } } },
+                webserver: {
+                    wsagents: {
+                        "node//test/server1": {
+                            dbNodeKey: "node//test/server1",
+                            dbMeshKey: "mesh//test",
+                            agentInfo: { agentId: 3 },
+                            send(message) { sent.push(JSON.parse(message)); }
+                        }
+                    },
+                    meshes: {},
+                    CreateNodeDispatchTargets() { return []; },
+                    GetNodeWithRights(domain, user, nodeId, callback) {
+                        callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true);
+                    }
+                },
+                DispatchEvent() {},
+                debug() {}
+            },
+            registerPluginTab() {}
+        });
+
+        instance.persistence.saveConfig({
+            scope: {
+                meshIds: ["mesh//test"],
+                nodeIds: []
+            },
+            integrations: {
+                famousRecon: {
+                    enabled: true,
+                    endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
+                    apiKey: "fok_test_key",
+                    requestTimeoutMs: 10000
+                }
+            }
+        });
+
+        instance.persistence.saveState("node//test/server1", {
+            schemaVersion: 1,
+            nodeId: "node//test/server1",
+            meshId: "mesh//test",
+            domainId: "test",
+            lastPluginVersionApplied: pluginMetadata.version,
+            statusSnapshot: {
+                snapshotHash: "status-hash",
+                systemSummary: {
+                    operatingSystem: {
+                        computerName: "SERVER1"
+                    }
+                },
+                printers: [],
+                paymentTerminalCandidates: [],
+                warnings: []
+            },
+            statusHash: "status-hash",
+            lastStatusScanAt: now,
+            lastFullScanAt: now,
+            lastStatusResult: "ok",
+            lastFullResult: "ok",
+            fullSnapshot: {
+                snapshotHash: "full-hash",
+                systemSummary: {
+                    operatingSystem: {
+                        computerName: "SERVER1"
+                    }
+                },
+                peripherals: [],
+                printers: [],
+                paymentTerminalCandidates: [],
+                warnings: []
+            },
+            previousFullSnapshot: null,
+            rawFullPayload: null,
+            previousRawFullPayload: null,
+            diff: null,
+            changedSincePrevious: false,
+            lastError: null,
+            shutdown: {
+                lastAttemptedSlotKey: "2026-04-08:02:00:00",
+                declinedDate: null,
+                lastResultStatus: "blocked",
+                lastResultAt: now,
+                lastError: "Waiting for linked devices.",
+                activeRequestId: null,
+                activeSince: null,
+                activeUntil: null
+            },
+            scheduler: {
+                queuedFull: false,
+                queuedFullReason: null,
+                runningMode: null,
+                runningSince: null,
+                nextStatusScanAt: now + 60_000,
+                nextFullScanAt: now + 60_000,
+                unsupportedUntil: null
+            },
+            events: {
+                lastFailureEventAt: null,
+                lastFailureEventKey: null
+            }
+        });
+
+        instance.server_startup();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        clearInterval(instance.runtime.schedulerTimer);
+
+        assert.ok(
+            sent.some((message) =>
+                message.pluginaction === "shutdown" &&
+                message.slotKey === "2026-04-08:02:00:00"
+            )
+        );
+    } finally {
+        global.fetch = originalFetch;
     }
 });
