@@ -291,8 +291,8 @@ test("server startup writes a visible startup summary with FamousRecon config he
                 line.includes("centralreconperipherals: startup") &&
                 line.includes(`version=${pluginMetadata.version}`) &&
                 line.includes("famousRecon=enabled") &&
-                line.includes("supabase=set") &&
                 line.includes("endpoint=set") &&
+                line.includes("directDbDeprecated=present") &&
                 line.includes("shutdownForceClose=enabled")
             )
         );

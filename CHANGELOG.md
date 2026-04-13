@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Retired the plugin's direct Supabase/PostgREST export path into legacy `server_telemetry`. Telemetry now exports only through the Famous Recon fleet API so the backend can own current-state, raw history, rollups, and event generation without double-writing old tables.
+- Updated the admin UI and startup/debug health indicators to reflect the API-only export path while still flagging deprecated direct-DB config if old settings are present.
+- Removed the old Supabase E2E script and related direct-insert test coverage so the shipped plugin surface matches the supported production architecture.
+
 ## 0.3.4
 
 - Fixed a shutdown waterfall retry bug where a device marked `blocked` at the start of a slot would never be re-checked again during that same slot, even after linked POS devices or prerequisites became ready a minute later.

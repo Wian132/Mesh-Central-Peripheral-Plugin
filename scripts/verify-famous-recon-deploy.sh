@@ -59,6 +59,7 @@ else
       | "  enabled: \(.enabled // false)\n"
         + "  endpointUrl: \(.endpointUrl // "")\n"
         + "  apiKey: " + (if ((.apiKey // "")|tostring|length) > 8 then ((.apiKey // "")|tostring|.[0:4] + "***" + .[-4:]) else "***" end) + "\n"
+        + "  directDbDeprecated: " + (if (((.supabaseUrl // "")|tostring|length) > 0 or ((.supabaseAnonKey // "")|tostring|length) > 0) then "present" else "absent" end) + "\n"
         + "  deviceType: \(.deviceType // "")\n"
         + "  exportOnStatusScans: \(.exportOnStatusScans // false)\n"
         + "  exportOnFullScans: \(.exportOnFullScans // false)\n"

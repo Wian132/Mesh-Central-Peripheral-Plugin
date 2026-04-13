@@ -25,7 +25,6 @@ const {
     fetchFleetDeviceConfig,
     buildTelemetryPayload,
     sendTelemetry,
-    sendTelemetryToSupabase,
     truncateForLog
 } = require("./lib/famous-recon");
 const { safeJsonParse, uniqueStrings } = require("./lib/utils");
@@ -214,6 +213,10 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         const famousRecon = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
             ? obj.runtime.config.integrations.famousRecon
             : {};
+        const hasDeprecatedDirectDbConfig = Boolean(
+            String(famousRecon.supabaseUrl || "").trim() ||
+            String(famousRecon.supabaseAnonKey || "").trim()
+        );
         const scope = obj.runtime.config.scope || {};
         const scopedMeshes = Array.isArray(scope.meshIds) ? scope.meshIds.length : 0;
         const scopedNodes = Array.isArray(scope.nodeIds) ? scope.nodeIds.length : 0;
@@ -222,8 +225,8 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             ": startup" +
             " version=" + getCurrentPluginVersion() +
             " famousRecon=" + (famousRecon.enabled === true ? "enabled" : "disabled") +
-            " supabase=" + (String(famousRecon.supabaseUrl || "").trim() ? "set" : "missing") +
             " endpoint=" + (String(famousRecon.endpointUrl || "").trim() ? "set" : "missing") +
+            " directDbDeprecated=" + (hasDeprecatedDirectDbConfig ? "present" : "absent") +
             " shutdownForceClose=" + (famousRecon.forceShutdownAppsClosed === true ? "enabled" : "disabled") +
             " scopedMeshes=" + scopedMeshes +
             " scopedNodes=" + scopedNodes
@@ -910,24 +913,6 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             inventoryChanged: mode === "full" ? Boolean(state.changedSincePrevious) : false
         });
 
-        const useSupabase = String(integration.supabaseUrl || "").trim() !== "";
-
-        if (useSupabase) {
-            logFamousReconDebug("Supabase export attempt: scanMode=" + mode + " nodeId=" + String(viewState.nodeId || "") + " deviceId=" + deviceId);
-            const result = await sendTelemetryToSupabase(integration, payload);
-            if (result.skipped) {
-                logFamousReconDebug("Supabase export skipped: " + String(result.reason || "internal skip"));
-                return;
-            }
-            if (result.ok) {
-                if (currentHash) { markExportedHash(state, mode, currentHash); saveState(state.nodeId, state); }
-                logFamousReconDebug("Supabase export ok: deviceId=" + deviceId + " serverId=" + (result.serverId || "n/a") + " httpStatus=" + (result.status != null ? result.status : "n/a"));
-                return;
-            }
-            const statusPart = result.status != null ? (" httpStatus=" + result.status) : "";
-            logFamousReconDebug("Supabase export failed: deviceId=" + deviceId + statusPart + " — " + truncateForLog(result.error || "unknown error", 500));
-            return;
-        }
 
         logFamousReconDebug("Famous Recon export attempt: scanMode=" + mode + " | " + buildExportAttemptLogLine(integration, payload));
         const result = await sendTelemetry(integration, payload);
@@ -1104,7 +1089,10 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                     enabled: fr.enabled === true,
                     hasEndpointUrl: Boolean(String(fr.endpointUrl || "").trim()),
                     hasApiKey: Boolean(String(fr.apiKey || "").trim()),
-                    hasSupabaseUrl: Boolean(String(fr.supabaseUrl || "").trim())
+                    hasDeprecatedDirectDbConfig: Boolean(
+                        String(fr.supabaseUrl || "").trim() ||
+                        String(fr.supabaseAnonKey || "").trim()
+                    )
                 },
                 devices
             });

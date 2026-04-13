@@ -181,16 +181,16 @@ Recommended v1 rollout config:
 - keep `maxConcurrentScans` at `3`
 
 Optional CentralRecon dashboard export:
-- leave `integrations.famousRecon.enabled` off until the FamousRecon API route and Supabase migration are deployed
+- leave `integrations.famousRecon.enabled` off until the FamousRecon API route and database migration are deployed
 - set `integrations.famousRecon.endpointUrl` to your CentralRecon web app route, for example `https://app.centralrecon.com/api/fleet/mesh-plugin-telemetry`
 - use a FamousRecon fleet organization deployment key for `integrations.famousRecon.apiKey`
 - set `integrations.famousRecon.deviceType` to `admin`, `pos`, or `other` only when you need to override the existing FamousRecon device type for a rollout lane
 - when that override is left blank, the plugin still exports Office fields when detected so mixed device fleets can preserve their existing types safely
 - keep server devices on the existing server telemetry lane rather than exporting them through this plugin
 - legacy HTTP export retries once without `healthSignals` if an older endpoint rejects that field
-- direct Supabase export retries once without unsupported plugin/health columns if the target schema has not been migrated yet
+- direct database writes are no longer supported from the plugin; all telemetry now flows through the Famous Recon fleet API so the backend can own current-state, raw history, rollups, and events consistently
 
-Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. As of `0.2.1`, plugin startup also writes a one-line summary to the MeshCentral service output with the plugin version plus FamousRecon config health (`enabled`, `supabase`, `endpoint`) so restarts are easier to verify from `journalctl`. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
+Debugging export (0.1.12+): with Famous Recon enabled, MeshCentral plugin debug output includes each POST attempt (masked API key), HTTP status, failure bodies (truncated), and skip reasons. As of `0.2.1`, plugin startup also writes a one-line summary to the MeshCentral service output with the plugin version plus FamousRecon config health (`enabled`, `endpoint`, `directDbDeprecated`) so restarts are easier to verify from `journalctl`. On the MeshCentral host, run `bash scripts/verify-famous-recon-deploy.sh` (set `MESHCENTRAL_DATA` if your data directory is not `/opt/meshcentral/meshcentral-data`) to confirm the installed plugin version, `lib/famous-recon.js` on disk, and masked runtime integration settings.
 
 ## Testing
 
@@ -198,12 +198,6 @@ Automated tests:
 
 ```bash
 npm test
-```
-
-Explicit Supabase E2E coverage remains opt-in:
-
-```bash
-npm run test:e2e:supabase
 ```
 
 Automated coverage includes:

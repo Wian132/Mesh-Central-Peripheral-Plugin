@@ -113,3 +113,17 @@ test("famous recon config preserves opt-in forced shutdown setting", () => {
     assert.deepEqual(result.errors, []);
     assert.equal(result.config.integrations.famousRecon.forceShutdownAppsClosed, true);
 });
+
+test("famous recon export now requires endpoint configuration instead of direct supabase settings", () => {
+    const result = sanitizeConfig({
+        integrations: {
+            famousRecon: {
+                enabled: true,
+                supabaseUrl: "https://example.supabase.co",
+                supabaseAnonKey: "anon-key"
+            }
+        }
+    });
+
+    assert.ok(result.errors.some((error) => error.includes("endpointUrl")));
+});
