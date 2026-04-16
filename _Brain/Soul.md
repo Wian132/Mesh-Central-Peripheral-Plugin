@@ -1,0 +1,1 @@
+C:/claude-obsidian/Soul.md
