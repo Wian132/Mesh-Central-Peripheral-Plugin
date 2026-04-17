@@ -1,12 +1,12 @@
 # Hot Cache — CentralRecon Peripheral Plugin
 
-**Date:** 2026-04-16 | **Plugin version:** 0.4.0
+**Date:** 2026-04-17 | **Plugin version:** 0.4.1
 
 ---
 
 ## Current State
 
-The plugin is in production operation. All core subsystems are functional and the architecture is stable post-v0.4.0 cleanup.
+The plugin is in production operation. All core subsystems are functional and the architecture is stable post-v0.4.1 metadata refresh.
 
 ---
 
@@ -72,9 +72,13 @@ The plugin is in production operation. All core subsystems are functional and th
 
 ---
 
-## Recent Additions (v0.3.x – v0.4.0)
+## Recent Additions (v0.3.x – v0.4.1)
 
-### v0.4.0 — API-only export (current)
+### v0.4.1 — metadata refresh
+- Bumped plugin metadata to publish a fresh MeshCentral update after the related Admin office shutdown rollout landed in FamousRecon.
+- No plugin runtime behavior changed in this release; the shutdown logic update itself lives in the hub backend.
+
+### v0.4.0 — API-only export
 - **Retired direct Supabase export path.** Telemetry now goes exclusively to `Famous Recon fleet API`. No more double-writes to `server_telemetry`.
 - Admin UI and startup logs updated to reflect API-only path; deprecated direct-DB config still detected and flagged.
 - Legacy Supabase E2E tests removed; shipped plugin surface now matches production architecture.

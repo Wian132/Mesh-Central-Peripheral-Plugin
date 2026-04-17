@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Bumped the published plugin metadata so MeshCentral can surface a fresh update after the related Admin office shutdown rollout shipped in FamousRecon.
+- Plugin shutdown behavior is unchanged in this release; the Admin office standalone shutdown logic itself lives in the hub backend.
+
 ## 0.4.0
 
 - Retired the plugin's direct Supabase/PostgREST export path into legacy `server_telemetry`. Telemetry now exports only through the Famous Recon fleet API so the backend can own current-state, raw history, rollups, and event generation without double-writing old tables.
