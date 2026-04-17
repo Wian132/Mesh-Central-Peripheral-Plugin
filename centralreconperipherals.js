@@ -301,6 +301,54 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         res.set("Expires", "0");
     }
 
+    function buildShutdownStatusForView(state) {
+        const shutdown = state && state.shutdown ? state.shutdown : null;
+        if (!shutdown) { return null; }
+
+        const result = {
+            lastResultStatus:
+                shutdown.lastResultStatus == null
+                    ? null
+                    : String(shutdown.lastResultStatus || "").trim() || null,
+            lastResultAt: shutdown.lastResultAt ? new Date(shutdown.lastResultAt).toISOString() : null,
+            lastError:
+                shutdown.lastError == null
+                    ? null
+                    : String(shutdown.lastError || "").trim() || null,
+            lastAttemptedSlotKey:
+                shutdown.lastAttemptedSlotKey == null
+                    ? null
+                    : String(shutdown.lastAttemptedSlotKey || "").trim() || null,
+            declinedDate:
+                shutdown.declinedDate == null
+                    ? null
+                    : String(shutdown.declinedDate || "").trim() || null,
+            activeSince: shutdown.activeSince ? new Date(shutdown.activeSince).toISOString() : null,
+            activeUntil: shutdown.activeUntil ? new Date(shutdown.activeUntil).toISOString() : null,
+            activeRequestId:
+                shutdown.activeRequestId == null
+                    ? null
+                    : String(shutdown.activeRequestId || "").trim() || null
+        };
+
+        return Object.values(result).some((value) => value != null && value !== "") ? result : null;
+    }
+
+    function getShutdownStateFingerprint(state) {
+        const shutdownStatus = buildShutdownStatusForView(state);
+        if (!shutdownStatus) { return "none"; }
+        return JSON.stringify([
+            shutdownStatus.lastResultStatus || null,
+            shutdownStatus.lastResultAt || null,
+            shutdownStatus.lastError || null,
+            shutdownStatus.lastAttemptedSlotKey || null,
+            shutdownStatus.declinedDate || null,
+            shutdownStatus.activeSince || null,
+            shutdownStatus.activeUntil || null,
+            shutdownStatus.activeRequestId || null
+        ]);
+    }
+
     function buildViewState(state) {
         const warnings = uniqueStrings([
             ...(state.statusSnapshot && state.statusSnapshot.warnings ? state.statusSnapshot.warnings : []),
@@ -344,6 +392,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             paymentTerminalCandidates,
             warnings,
             lastError: state.lastError,
+            shutdownStatus: buildShutdownStatusForView(state),
             diffSummary: state.diff || {
                 printers: { added: [], removed: [], changed: [] },
                 peripherals: { added: [], removed: [], changed: [] },
@@ -399,9 +448,17 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
 
     function markShutdownState(state, status, error) {
         if (!state.shutdown) { return; }
-        state.shutdown.lastResultStatus = status || null;
-        state.shutdown.lastResultAt = nowMs();
-        state.shutdown.lastError = error || null;
+        const nextStatus = status || null;
+        const nextError = error || null;
+        const didChange =
+            state.shutdown.lastResultStatus !== nextStatus ||
+            state.shutdown.lastError !== nextError;
+
+        state.shutdown.lastResultStatus = nextStatus;
+        state.shutdown.lastError = nextError;
+        if (didChange || !state.shutdown.lastResultAt) {
+            state.shutdown.lastResultAt = nowMs();
+        }
     }
 
     function dispatchShutdown(nodeId, meshId, options) {
@@ -437,6 +494,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         state.shutdown.lastAttemptedSlotKey = options.slotKey;
         markShutdownState(state, "dispatched", null);
         saveState(nodeId, state);
+        requestShutdownStatusExport(state, "dispatched");
 
         obj.runtime.activeShutdowns.set(nodeId, {
             requestId,
@@ -478,6 +536,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 error && error.message ? error.message : String(error)
             );
             saveState(nodeId, state);
+            requestShutdownStatusExport(state, "dispatch_error");
             return { ok: false, message: "Unable to send shutdown request to the agent." };
         }
     }
@@ -495,6 +554,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 markShutdownState(state, "awaiting_offline", null);
             }
             saveState(active.nodeId, state);
+            requestShutdownStatusExport(state, "awaiting_offline");
         }
     }
 
@@ -635,6 +695,11 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 state.shutdown.activeRequestId = null;
                 state.shutdown.activeSince = null;
                 state.shutdown.activeUntil = null;
+                if (state.shutdown.lastResultStatus === "dispatched") {
+                    markShutdownState(state, "awaiting_offline", null);
+                }
+                saveState(agent.dbNodeKey, state);
+                requestShutdownStatusExport(state, "active_timeout");
             }
 
             const identity = getFamousReconIdentityForState(state);
@@ -657,6 +722,9 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             if (!control.response || control.response.ok !== true || control.response.skipped) {
                 if (control.response && control.response.ok === false && control.response.error) {
                     markShutdownState(state, "control_error", control.response.error);
+                    saveState(agent.dbNodeKey, state);
+                    requestShutdownStatusExport(state, "control_error");
+                    continue;
                 }
                 saveState(agent.dbNodeKey, state);
                 continue;
@@ -693,6 +761,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             }
 
             if (shutdownState.shutdown_allowed !== true) {
+                state.shutdown.lastAttemptedSlotKey = shutdownState.current_slot_key;
                 markShutdownState(
                     state,
                     "blocked",
@@ -701,6 +770,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                         : String(shutdownState.summary || "backend_blocked")
                 );
                 saveState(agent.dbNodeKey, state);
+                requestShutdownStatusExport(state, "blocked");
                 continue;
             }
 
@@ -720,6 +790,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             if (!dispatchResult.ok) {
                 markShutdownState(state, "dispatch_error", dispatchResult.message || "dispatch_failed");
                 saveState(agent.dbNodeKey, state);
+                requestShutdownStatusExport(state, "dispatch_error");
             }
         }
     }
@@ -845,8 +916,14 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     }
 
     function getCurrentExportHash(state, mode) {
-        if (mode === "status") { return state.statusHash || null; }
-        return state.fullSnapshot && state.fullSnapshot.snapshotHash ? state.fullSnapshot.snapshotHash : null;
+        const snapshotHash = mode === "status"
+            ? (state.statusHash || null)
+            : (state.fullSnapshot && state.fullSnapshot.snapshotHash ? state.fullSnapshot.snapshotHash : null);
+        const shutdownFingerprint = getShutdownStateFingerprint(state);
+        return JSON.stringify({
+            snapshotHash: snapshotHash || null,
+            shutdownFingerprint: shutdownFingerprint || "none"
+        });
     }
 
     function getLastExportedHash(state, mode) {
@@ -864,6 +941,27 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
     function isForceExportDue(state) {
         if (typeof state.lastExportedAt !== "number") { return true; }
         return (nowMs() - state.lastExportedAt) >= DEDUP_FORCE_EXPORT_MS;
+    }
+
+    function getShutdownExportMode(state) {
+        if (state && state.statusHash) { return "status"; }
+        if (state && state.fullSnapshot && state.fullSnapshot.snapshotHash) { return "full"; }
+        return null;
+    }
+
+    function requestShutdownStatusExport(state, reason) {
+        const mode = getShutdownExportMode(state);
+        if (!mode) { return; }
+        exportTelemetryIfConfigured(state, mode).catch((error) => {
+            obj.meshServer.debug(
+                "plugin",
+                SHORT_NAME +
+                ": Famous Recon shutdown export crashed (" +
+                String(reason || mode) +
+                "): " +
+                (error && error.message ? error.message : String(error))
+            );
+        });
     }
 
     async function exportTelemetryIfConfigured(state, mode) {
@@ -1038,6 +1136,7 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
                 );
             }
             saveState(nodeId, state);
+            requestShutdownStatusExport(state, command.status || "error");
         }
     };
 

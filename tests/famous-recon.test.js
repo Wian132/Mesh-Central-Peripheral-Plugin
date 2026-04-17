@@ -183,3 +183,44 @@ test("telemetry payload preserves Office fields when the rollout preserves exist
         diskHealthStatus: "warning"
     });
 });
+
+test("telemetry payload includes shutdownStatus when the plugin has device-side shutdown state", () => {
+    const payload = buildTelemetryPayload({
+        nodeId: "node//sample/pos-shutdown",
+        systemSummary: {
+            operatingSystem: {
+                computerName: "STEMAIN1"
+            }
+        },
+        shutdownStatus: {
+            lastResultStatus: "blocked",
+            lastResultAt: "2026-04-17T01:25:00.000Z",
+            lastError: "Waiting for server handoff.",
+            lastAttemptedSlotKey: "2026-04-17:03:00:00",
+            declinedDate: null,
+            activeSince: null,
+            activeUntil: null,
+            activeRequestId: null
+        },
+        printers: [],
+        peripherals: [],
+        paymentTerminalCandidates: []
+    }, {
+        scanMode: "status",
+        pluginVersion: "0.4.0",
+        deviceId: "STEMAIN1",
+        deviceType: "pos",
+        inventoryChanged: false
+    });
+
+    assert.deepEqual(payload.shutdownStatus, {
+        lastResultStatus: "blocked",
+        lastResultAt: "2026-04-17T01:25:00.000Z",
+        lastError: "Waiting for server handoff.",
+        lastAttemptedSlotKey: "2026-04-17:03:00:00",
+        declinedDate: null,
+        activeSince: null,
+        activeUntil: null,
+        activeRequestId: null
+    });
+});

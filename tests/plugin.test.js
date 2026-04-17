@@ -9,6 +9,98 @@ const assert = require("node:assert/strict");
 const pluginFactory = require("../centralreconperipherals").centralreconperipherals;
 const pluginMetadata = require("../config.json");
 
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function makeJsonResponse(body, status) {
+    const httpStatus = typeof status === "number" ? status : 200;
+    return {
+        ok: httpStatus >= 200 && httpStatus < 300,
+        status: httpStatus,
+        async json() { return body; },
+        async text() {
+            return typeof body === "string" ? body : JSON.stringify(body);
+        }
+    };
+}
+
+function createBaseState(now, computerName, overrides) {
+    return Object.assign({
+        schemaVersion: 1,
+        nodeId: "node//test/device1",
+        meshId: "mesh//test",
+        domainId: "test",
+        lastPluginVersionApplied: pluginMetadata.version,
+        statusSnapshot: {
+            snapshotHash: "status-hash",
+            systemSummary: {
+                operatingSystem: {
+                    computerName
+                }
+            },
+            printers: [],
+            paymentTerminalCandidates: [],
+            warnings: []
+        },
+        statusHash: "status-hash",
+        lastStatusScanAt: now,
+        lastFullScanAt: now,
+        lastStatusResult: "ok",
+        lastFullResult: "ok",
+        fullSnapshot: {
+            snapshotHash: "full-hash",
+            systemSummary: {
+                operatingSystem: {
+                    computerName
+                }
+            },
+            peripherals: [],
+            printers: [],
+            paymentTerminalCandidates: [],
+            warnings: []
+        },
+        previousFullSnapshot: null,
+        rawFullPayload: null,
+        previousRawFullPayload: null,
+        diff: null,
+        changedSincePrevious: false,
+        lastError: null,
+        lastExportedStatusHash: null,
+        lastExportedFullHash: null,
+        lastExportedAt: null,
+        shutdown: {
+            lastAttemptedSlotKey: null,
+            declinedDate: null,
+            lastResultStatus: null,
+            lastResultAt: null,
+            lastError: null,
+            activeRequestId: null,
+            activeSince: null,
+            activeUntil: null
+        },
+        scheduler: {
+            queuedFull: false,
+            queuedFullReason: null,
+            runningMode: null,
+            runningSince: null,
+            nextStatusScanAt: now + 60_000,
+            nextFullScanAt: now + 60_000,
+            unsupportedUntil: null
+        },
+        events: {
+            lastFailureEventAt: null,
+            lastFailureEventKey: null
+        }
+    }, overrides || {});
+}
+
+async function runStartupEvaluation(instance) {
+    instance.server_startup();
+    await sleep(60);
+    clearInterval(instance.runtime.schedulerTimer);
+}
+
 test("plugin factory instantiates expected handlers", () => {
     const instance = pluginFactory({
         parent: {
@@ -439,6 +531,299 @@ test("blocked same-slot shutdown states are retried when control later allows sh
                 message.pluginaction === "shutdown" &&
                 message.slotKey === "2026-04-08:02:00:00"
             )
+        );
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("blocked shutdown state exports immediately, dedupes identical retries, then exports dispatched state", async () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-shutdown-export-"));
+    const sent = [];
+    const telemetryPosts = [];
+    let controlMode = "blocked";
+    const originalFetch = global.fetch;
+
+    global.fetch = async (url, options) => {
+        const target = String(url || "");
+        if (target.indexOf("/api/fleet/agent-config") >= 0) {
+            if (controlMode === "blocked") {
+                return makeJsonResponse({
+                    config: { shutdown_countdown_sec: 300 },
+                    shutdown_state: {
+                        participates_in_waterfall: true,
+                        slot_due_now: true,
+                        current_slot_key: "2026-04-17:03:00:00",
+                        current_date_local: "2026-04-17",
+                        shutdown_allowed: false,
+                        blocking_reasons: ["Waiting for linked devices."]
+                    }
+                });
+            }
+            return makeJsonResponse({
+                config: { shutdown_countdown_sec: 300 },
+                shutdown_state: {
+                    participates_in_waterfall: true,
+                    slot_due_now: true,
+                    current_slot_key: "2026-04-17:03:00:00",
+                    current_date_local: "2026-04-17",
+                    shutdown_allowed: true
+                }
+            });
+        }
+
+        if (target.indexOf("/api/fleet/mesh-plugin-telemetry") >= 0) {
+            telemetryPosts.push(JSON.parse(options.body));
+            return makeJsonResponse({ ok: true });
+        }
+
+        throw new Error("Unexpected fetch target: " + target);
+    };
+
+    try {
+        const instance = pluginFactory({
+            parent: {
+                datapath,
+                config: { domains: { "": { id: "" } } },
+                webserver: {
+                    wsagents: {
+                        "node//test/device1": {
+                            dbNodeKey: "node//test/device1",
+                            dbMeshKey: "mesh//test",
+                            agentInfo: { agentId: 3 },
+                            send(message) { sent.push(JSON.parse(message)); }
+                        }
+                    },
+                    meshes: {},
+                    CreateNodeDispatchTargets() { return []; },
+                    GetNodeWithRights(domain, user, nodeId, callback) {
+                        callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true);
+                    }
+                },
+                DispatchEvent() {},
+                debug() {}
+            },
+            registerPluginTab() {}
+        });
+
+        instance.persistence.saveConfig({
+            scope: { meshIds: ["mesh//test"], nodeIds: [] },
+            integrations: {
+                famousRecon: {
+                    enabled: true,
+                    endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
+                    apiKey: "fok_test_key",
+                    exportOnStatusScans: true,
+                    exportOnFullScans: true
+                }
+            }
+        });
+
+        const now = Date.now();
+        instance.persistence.saveState(
+            "node//test/device1",
+            createBaseState(now, "POS1")
+        );
+
+        await runStartupEvaluation(instance);
+        assert.equal(
+            telemetryPosts.filter((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "blocked").length,
+            1
+        );
+
+        instance.runtime.shutdownControlCache.clear();
+        await runStartupEvaluation(instance);
+        assert.equal(
+            telemetryPosts.filter((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "blocked").length,
+            1
+        );
+
+        controlMode = "allowed";
+        instance.runtime.shutdownControlCache.clear();
+        await runStartupEvaluation(instance);
+
+        assert.ok(
+            telemetryPosts.some((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "dispatched")
+        );
+        assert.ok(
+            sent.some((message) => message.pluginaction === "shutdown" && message.slotKey === "2026-04-17:03:00:00")
+        );
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("control_error state exports immediately when backend control fetch fails", async () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-control-error-"));
+    const telemetryPosts = [];
+    const originalFetch = global.fetch;
+
+    global.fetch = async (url, options) => {
+        const target = String(url || "");
+        if (target.indexOf("/api/fleet/agent-config") >= 0) {
+            return makeJsonResponse("backend unavailable", 503);
+        }
+        if (target.indexOf("/api/fleet/mesh-plugin-telemetry") >= 0) {
+            telemetryPosts.push(JSON.parse(options.body));
+            return makeJsonResponse({ ok: true });
+        }
+        throw new Error("Unexpected fetch target: " + target);
+    };
+
+    try {
+        const instance = pluginFactory({
+            parent: {
+                datapath,
+                config: { domains: { "": { id: "" } } },
+                webserver: {
+                    wsagents: {
+                        "node//test/device1": {
+                            dbNodeKey: "node//test/device1",
+                            dbMeshKey: "mesh//test",
+                            agentInfo: { agentId: 3 },
+                            send() {}
+                        }
+                    },
+                    meshes: {},
+                    CreateNodeDispatchTargets() { return []; },
+                    GetNodeWithRights(domain, user, nodeId, callback) {
+                        callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true);
+                    }
+                },
+                DispatchEvent() {},
+                debug() {}
+            },
+            registerPluginTab() {}
+        });
+
+        instance.persistence.saveConfig({
+            scope: { meshIds: ["mesh//test"], nodeIds: [] },
+            integrations: {
+                famousRecon: {
+                    enabled: true,
+                    endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
+                    apiKey: "fok_test_key"
+                }
+            }
+        });
+        instance.persistence.saveState(
+            "node//test/device1",
+            createBaseState(Date.now(), "POS1")
+        );
+
+        await runStartupEvaluation(instance);
+
+        assert.ok(
+            telemetryPosts.some((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "control_error")
+        );
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("dispatch_error and shutdownResult updates export immediately", async () => {
+    const datapath = fs.mkdtempSync(path.join(os.tmpdir(), "centralreconperipherals-dispatch-error-"));
+    const telemetryPosts = [];
+    const originalFetch = global.fetch;
+
+    global.fetch = async (url, options) => {
+        const target = String(url || "");
+        if (target.indexOf("/api/fleet/agent-config") >= 0) {
+            return makeJsonResponse({
+                config: { shutdown_countdown_sec: 300 },
+                shutdown_state: {
+                    participates_in_waterfall: true,
+                    slot_due_now: true,
+                    current_slot_key: "2026-04-17:03:00:00",
+                    current_date_local: "2026-04-17",
+                    shutdown_allowed: true
+                }
+            });
+        }
+        if (target.indexOf("/api/fleet/mesh-plugin-telemetry") >= 0) {
+            telemetryPosts.push(JSON.parse(options.body));
+            return makeJsonResponse({ ok: true });
+        }
+        throw new Error("Unexpected fetch target: " + target);
+    };
+
+    try {
+        const instance = pluginFactory({
+            parent: {
+                datapath,
+                config: { domains: { "": { id: "" } } },
+                webserver: {
+                    wsagents: {
+                        "node//test/device1": {
+                            dbNodeKey: "node//test/device1",
+                            dbMeshKey: "mesh//test",
+                            agentInfo: { agentId: 3 },
+                            send() { throw new Error("agent send failed"); }
+                        }
+                    },
+                    meshes: {},
+                    CreateNodeDispatchTargets() { return []; },
+                    GetNodeWithRights(domain, user, nodeId, callback) {
+                        callback({ _id: nodeId, meshid: "mesh//test" }, 0xFFFFFFFF, true);
+                    }
+                },
+                DispatchEvent() {},
+                debug() {}
+            },
+            registerPluginTab() {}
+        });
+
+        instance.persistence.saveConfig({
+            scope: { meshIds: ["mesh//test"], nodeIds: [] },
+            integrations: {
+                famousRecon: {
+                    enabled: true,
+                    endpointUrl: "https://centralrecon.com/api/fleet/mesh-plugin-telemetry",
+                    apiKey: "fok_test_key"
+                }
+            }
+        });
+        instance.persistence.saveState(
+            "node//test/device1",
+            createBaseState(Date.now(), "POS1")
+        );
+
+        await runStartupEvaluation(instance);
+        assert.ok(
+            telemetryPosts.some((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "dispatch_error")
+        );
+
+        instance.serveraction(
+            {
+                pluginaction: "shutdownResult",
+                status: "cancelled",
+                nightKey: "2026-04-17"
+            },
+            {
+                dbNodeKey: "node//test/device1",
+                dbMeshKey: "mesh//test"
+            }
+        );
+        await sleep(30);
+
+        instance.serveraction(
+            {
+                pluginaction: "shutdownResult",
+                status: "error",
+                error: "shutdown.exe returned 5"
+            },
+            {
+                dbNodeKey: "node//test/device1",
+                dbMeshKey: "mesh//test"
+            }
+        );
+        await sleep(30);
+
+        assert.ok(
+            telemetryPosts.some((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "cancelled")
+        );
+        assert.ok(
+            telemetryPosts.some((payload) => payload.shutdownStatus && payload.shutdownStatus.lastResultStatus === "error")
         );
     } finally {
         global.fetch = originalFetch;
