@@ -11,7 +11,13 @@ const {
 const { buildFullDiff } = require("./lib/diff");
 const { createHashHex } = require("./lib/hash");
 const { compileRules } = require("./lib/matching");
-const { mergeHealthSignals, normalizeFullPayload, normalizeStatusPayload } = require("./lib/normalize");
+const {
+    mergeHealthSignals,
+    normalizeFleetHealthPayload,
+    normalizeFleetInventoryPayload,
+    normalizeFullPayload,
+    normalizeStatusPayload
+} = require("./lib/normalize");
 const { Persistence } = require("./lib/persistence");
 const {
     applyCompletionSchedule,
@@ -22,6 +28,8 @@ const {
 const { renderAdminPage, renderDevicePage } = require("./lib/ui");
 const {
     buildExportAttemptLogLine,
+    buildFleetHealthTelemetryPayload,
+    buildFleetInventoryTelemetryPayload,
     fetchFleetDeviceConfig,
     buildTelemetryPayload,
     sendTelemetry,
@@ -410,6 +418,8 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         };
         if (mode === "status") { state.lastStatusResult = resultStatus || "error"; }
         if (mode === "full") { state.lastFullResult = resultStatus || "error"; }
+        if (mode === "fleet_inventory") { state.lastFleetInventoryResult = resultStatus || "error"; }
+        if (mode === "fleet_health") { state.lastFleetHealthResult = resultStatus || "error"; }
         emitFailureEventIfNeeded(state, mode, error);
     }
 
@@ -1029,6 +1039,93 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
         );
     }
 
+    function processFleetInventoryResult(state, payload) {
+        const snapshot = normalizeFleetInventoryPayload(payload);
+        state.fleetInventorySnapshot = snapshot;
+        state.lastFleetInventoryScanAt = nowMs();
+        state.lastFleetInventoryResult = "ok";
+    }
+
+    function processFleetHealthResult(state, payload) {
+        const snapshot = normalizeFleetHealthPayload(payload);
+        state.fleetHealthSnapshot = snapshot;
+        state.lastFleetHealthScanAt = nowMs();
+        state.lastFleetHealthResult = "ok";
+    }
+
+    async function exportFleetTelemetryIfConfigured(state, mode) {
+        const integration = obj.runtime.config.integrations && obj.runtime.config.integrations.famousRecon
+            ? obj.runtime.config.integrations.famousRecon
+            : null;
+        if (integration == null || integration.enabled !== true) { return; }
+
+        if (mode === "fleet_inventory" && integration.exportOnFleetInventory !== true) {
+            logFamousReconDebug("Fleet inventory export skipped: exportOnFleetInventory is false.");
+            return;
+        }
+        if (mode === "fleet_health" && integration.exportOnFleetHealth !== true) {
+            logFamousReconDebug("Fleet health export skipped: exportOnFleetHealth is false.");
+            return;
+        }
+
+        // Resolve deviceId (CSName) from whichever snapshot already exists. Fleet streams
+        // do not themselves collect system info, but a status/full scan has virtually
+        // always run first on any device that survives long enough to hit a weekly
+        // inventory window.
+        const systemSummary = (state.statusSnapshot && state.statusSnapshot.systemSummary)
+            || (state.fullSnapshot && state.fullSnapshot.systemSummary)
+            || null;
+        const operatingSystem = systemSummary && systemSummary.operatingSystem ? systemSummary.operatingSystem : {};
+        const fleetSnapshot = mode === "fleet_inventory" ? state.fleetInventorySnapshot : state.fleetHealthSnapshot;
+        const deviceId = String((fleetSnapshot && fleetSnapshot.hostname) || operatingSystem.computerName || "").trim();
+
+        if (deviceId === "" || !state.nodeId) {
+            logFamousReconDebug(
+                "Fleet " + mode + " export skipped: missing hostname or nodeId. nodeId=" +
+                String(state.nodeId || "") + " hostname=" + (deviceId === "" ? "(empty)" : deviceId)
+            );
+            return;
+        }
+
+        // Inventory dedup: skip when the hash matches the last successful push. Health is
+        // insert-only and always sent (scheduler is the only gate).
+        if (mode === "fleet_inventory" && fleetSnapshot && fleetSnapshot.inventoryHash) {
+            if (state.lastExportedFleetInventoryHash === fleetSnapshot.inventoryHash) {
+                logFamousReconDebug("Fleet inventory export skipped: hash unchanged (" + fleetSnapshot.inventoryHash.slice(0, 12) + "…).");
+                return;
+            }
+        }
+
+        const options = {
+            pluginVersion: String(pluginMetadata.version || ""),
+            nodeId: state.nodeId,
+            deviceId,
+            deviceType: integration.deviceType || ""
+        };
+        const payload = mode === "fleet_inventory"
+            ? buildFleetInventoryTelemetryPayload(fleetSnapshot, options)
+            : buildFleetHealthTelemetryPayload(fleetSnapshot, options);
+
+        logFamousReconDebug("Famous Recon export attempt: scanMode=" + mode + " | " + buildExportAttemptLogLine(integration, payload));
+        const result = await sendTelemetry(integration, payload);
+        if (result.skipped) {
+            logFamousReconDebug("Fleet " + mode + " export skipped: " + String(result.reason || "sendTelemetry internal skip"));
+            return;
+        }
+        if (result.ok) {
+            if (mode === "fleet_inventory" && fleetSnapshot && fleetSnapshot.inventoryHash) {
+                state.lastExportedFleetInventoryHash = fleetSnapshot.inventoryHash;
+                saveState(state.nodeId, state);
+            }
+            logFamousReconDebug("Fleet " + mode + " export ok: deviceId=" + deviceId + " httpStatus=" + (result.status != null ? result.status : "n/a"));
+            return;
+        }
+        const statusPart = result.status != null ? (" httpStatus=" + result.status) : "";
+        logFamousReconDebug(
+            "Fleet " + mode + " export failed: deviceId=" + deviceId + statusPart + " — " + truncateForLog(result.error || "unknown error", 500)
+        );
+    }
+
     function handleScanResult(command, sourceAgent) {
         const nodeId = sourceAgent && sourceAgent.dbNodeKey ? sourceAgent.dbNodeKey : command.nodeId;
         const meshId = sourceAgent && sourceAgent.dbMeshKey ? sourceAgent.dbMeshKey : null;
@@ -1056,6 +1153,24 @@ module.exports[SHORT_NAME] = function (pluginHandler) {
             applyCompletionSchedule(state, mode, nowMs(), obj.runtime.config, Math.random);
             markScanError(state, mode, command.error || "Unknown scan error.", "error");
             saveState(nodeId, state);
+            return;
+        }
+
+        // Fleet modes run in their own try/catch so collection or normalization failures
+        // never kill the existing status/full heartbeat path.
+        if (mode === "fleet_inventory" || mode === "fleet_health") {
+            try {
+                if (mode === "fleet_inventory") { processFleetInventoryResult(state, command.payload || {}); }
+                else { processFleetHealthResult(state, command.payload || {}); }
+            } catch (error) {
+                obj.meshServer.debug("plugin", SHORT_NAME + ": fleet " + mode + " processing crashed: " + (error && error.message ? error.message : String(error)));
+            }
+            applyCompletionSchedule(state, mode, nowMs(), obj.runtime.config, Math.random);
+            saveState(nodeId, state);
+            exportFleetTelemetryIfConfigured(state, mode).catch((error) => {
+                obj.meshServer.debug("plugin", SHORT_NAME + ": Fleet " + mode + " export crashed: " + (error && error.message ? error.message : String(error)));
+            });
+            requestScheduleEvaluation();
             return;
         }
 

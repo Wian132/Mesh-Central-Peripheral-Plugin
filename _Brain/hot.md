@@ -72,6 +72,19 @@ The plugin is in production operation. All core subsystems are functional and th
 
 ---
 
+## Pending (un-shipped, awaiting review — 2026-04-21)
+
+### Fleet telemetry streams — `fleet_inventory` + `fleet_health`
+Two new scan modes dispatched by the existing scheduler alongside status/full. Same POST endpoint, same headers, routed hub-side by `scanMode`.
+
+- **`fleet_inventory`** (cadence `schedule.fleetInventoryIntervalHours`, default 168h / weekly): static hardware snapshot — manufacturer/model, BIOS, OS edition/version/build/arch, install date, CPU model + cores, total RAM + DIMM detail, physical disks (Get-PhysicalDisk with Win32_DiskDrive serial fallback), primary NIC MAC. Hash-deduped: plugin skips the POST when `inventoryHash` matches `lastExportedFleetInventoryHash`.
+- **`fleet_health`** (cadence `schedule.fleetHealthIntervalHours`, default 24h / nightly): append-only snapshot — uptime_hours, free_space_pct, smart_status per disk (with MSStorageDriver_FailurePredictStatus where available, null on missing namespace), bsods_30d (Get-WinEvent System/1001), bsods_90d_count, unexpected_shutdowns_30d_count (System/6008), service_crashes_7d (Application/1000 top-20 distinct ProcessName — data-driven, no filter list).
+- Both streams run in isolated try/catch so a PowerShell failure cannot regress the POS/peripheral heartbeat.
+- Hub-side: new tables `fleet_device_hardware` (upsert on `(organization_id, mesh_node_id)`) and `fleet_device_health` (insert-only). RLS mirrors `fleet_servers` — `user_has_product_access('it') AND organization_id = get_user_organization_id()`. Service-role writes only; no anon-role policy (plugin never queries).
+- Table names are device-type-neutral; `device_type` column holds `windows_till` today, extensible to KDS/Linux in phase 2.
+- Migration SQL: `supabase/migrations/20260421_fleet_device_hardware.sql`, `supabase/migrations/20260421_fleet_device_health.sql`. Not yet applied.
+- Deployment blocked until after the 2026-04-30 JLL migration.
+
 ## Recent Additions (v0.3.x – v0.4.1)
 
 ### v0.4.1 — metadata refresh

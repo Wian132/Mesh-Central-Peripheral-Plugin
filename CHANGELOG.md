@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Added two new scheduler-dispatched telemetry streams alongside the existing status/full heartbeat: `fleet_inventory` (weekly, hash-deduped upsert of static hardware detail — manufacturer, BIOS, OS, CPU, RAM, DIMMs, disks, primary NIC MAC) and `fleet_health` (nightly append-only snapshot — uptime, free-space %, SMART + FailurePredictStatus, BSODs 30d/90d, unexpected shutdowns 30d, top-20 Application/1000 crash groups).
+- Reused the existing `/api/fleet/mesh-plugin-telemetry` POST, identity headers, and send path; hub dispatches by `scanMode` to new tables `fleet_device_hardware` and `fleet_device_health`. Migration SQL shipped under `supabase/migrations/`.
+- Both streams run under their own try/catch so a PowerShell or normalization failure cannot regress the POS/peripheral heartbeat. Cadences configurable via `schedule.fleetInventoryIntervalHours` (default 168) and `schedule.fleetHealthIntervalHours` (default 24).
+- PowerShell collectors hold to the PS 5.1 baseline, wrap every WMI/CIM call in try/catch, and treat a missing `MSStorageDriver_FailurePredictStatus` namespace as null rather than a fatal error on whitebox tills. Disk serial falls back to `Win32_DiskDrive.SerialNumber` when `Get-PhysicalDisk` is blank.
+
 ## 0.4.1
 
 - Bumped the published plugin metadata so MeshCentral can surface a fresh update after the related Admin office shutdown rollout shipped in FamousRecon.
