@@ -38,6 +38,19 @@ test("meshcore collector builds a PowerShell shutdown wrapper that can opt into 
     assert.match(command, /\$shutdownPath = '.*shutdown\.exe'/i);
     assert.match(command, /'\/f'/);
     assert.match(command, /\$LASTEXITCODE/);
+    assert.match(command, /WTSSendMessage/);
+    assert.match(command, /CentralRecon scheduled shutdown/);
+    assert.match(command, /Click Cancel to keep it on/);
+    assert.match(command, new RegExp(collector.shutdownCancelledMarker));
+});
+
+test("meshcore collector caps the shutdown cancel prompt timeout", () => {
+    const collector = require("../modules_meshcore/centralreconperipherals");
+    const shortCommand = collector.buildShutdownPowerShellCommand(30, "test", false);
+    const longCommand = collector.buildShutdownPowerShellCommand(300, "test", false);
+
+    assert.match(shortCommand, /wait 30 seconds to continue/);
+    assert.match(longCommand, /wait 120 seconds to continue/);
 });
 
 test("meshcore collector includes exit diagnostics when shutdown.exe fails", () => {

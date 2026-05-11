@@ -23,3 +23,6 @@ Detail of what happened, why it was surprising, and what to do instead.
 ---
 
 <!-- Entries below, newest first -->
+### 2026-05-11: Mesh shutdowns need a local cancel prompt before shutdown.exe
+The backend owns shutdown authorization, but the plugin is the final executor.
+Before invoking `shutdown.exe`, show a timed WTS prompt and report `cancelled` when the local user declines so the nightly slot is suppressed.

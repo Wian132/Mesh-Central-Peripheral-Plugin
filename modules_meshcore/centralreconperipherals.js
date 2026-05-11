@@ -3,6 +3,7 @@
 var mesh = null;
 var activeScan = null;
 var activeShutdown = null;
+var SHUTDOWN_CANCELLED_MARKER = "CENTRALRECON_SHUTDOWN_CANCELLED";
 
 function getPowerShellPath() {
     var winDir = process.env["WINDIR"] || process.env["windir"] || "C:\\Windows";
@@ -99,6 +100,25 @@ function escapePowerShellSingleQuoted(value) {
 }
 
 function buildShutdownPowerShellCommand(countdownSec, comment, forceAppsClosed) {
+    var promptTimeoutSec = Math.max(15, Math.min(Number(countdownSec) || 300, 120));
+    var wtsSource = [
+        "using System;",
+        "using System.Runtime.InteropServices;",
+        "public static class CentralReconShutdownPrompt {",
+        "    [DllImport(\"kernel32.dll\")]",
+        "    public static extern uint WTSGetActiveConsoleSessionId();",
+        "    [DllImport(\"wtsapi32.dll\", SetLastError = true, CharSet = CharSet.Unicode)]",
+        "    public static extern bool WTSSendMessage(IntPtr hServer, int sessionId, string title, int titleLength, string message, int messageLength, int style, int timeout, out int response, bool wait);",
+        "    public static int Show(string title, string message, int timeout) {",
+        "        uint sessionId = WTSGetActiveConsoleSessionId();",
+        "        if (sessionId == 0xFFFFFFFF) { return -2; }",
+        "        int response = 0;",
+        "        bool ok = WTSSendMessage(IntPtr.Zero, (int)sessionId, title, title.Length * 2, message, message.Length * 2, 0x00010031, timeout, out response, true);",
+        "        if (!ok) { return -1; }",
+        "        return response;",
+        "    }",
+        "}"
+    ].join("\r\n");
     var args = [
         "'/s'",
         "'/t'",
@@ -113,6 +133,18 @@ function buildShutdownPowerShellCommand(countdownSec, comment, forceAppsClosed) 
 
     return [
         "$ErrorActionPreference = 'Stop'",
+        "$promptTitle = 'CentralRecon scheduled shutdown'",
+        "$promptMessage = 'This computer is scheduled to shut down. Click Cancel to keep it on. Click OK or wait " + String(promptTimeoutSec) + " seconds to continue.'",
+        "$wtsSource = @'",
+        wtsSource,
+        "'@",
+        "try {",
+        "  Add-Type -TypeDefinition $wtsSource | Out-Null",
+        "  $promptResponse = [CentralReconShutdownPrompt]::Show($promptTitle, $promptMessage, " + String(promptTimeoutSec) + ")",
+        "  if ($promptResponse -eq 2) { [Console]::Out.Write('" + SHUTDOWN_CANCELLED_MARKER + "'); exit 0 }",
+        "} catch {",
+        "  [Console]::Error.Write('Shutdown prompt unavailable: ' + $_.Exception.Message)",
+        "}",
         "$shutdownPath = '" + escapePowerShellSingleQuoted(getShutdownPath()) + "'",
         "$arguments = @(" + args.join(", ") + ")",
         "$output = & $shutdownPath @arguments 2>&1 | Out-String",
@@ -120,7 +152,7 @@ function buildShutdownPowerShellCommand(countdownSec, comment, forceAppsClosed) 
         "$trimmed = $output.Trim()",
         "if ($trimmed.Length -gt 0) { [Console]::Out.Write($trimmed) }",
         "exit $exitCode"
-    ].join("; ");
+    ].join("\r\n");
 }
 
 function runShutdown(args) {
@@ -157,6 +189,12 @@ function runShutdown(args) {
                         "error",
                         formatExecFileError("Unable to start shutdown countdown", error, stdout, stderr)
                     );
+                    return;
+                }
+
+                if (normalizeExecText(stdout).indexOf(SHUTDOWN_CANCELLED_MARKER) >= 0) {
+                    activeShutdown = null;
+                    sendShutdownResult(args, "cancelled", null);
                     return;
                 }
 
@@ -728,5 +766,6 @@ module.exports = {
     formatExecFileError: formatExecFileError,
     getPowerShellArgs: getPowerShellArgs,
     getPowerShellPath: getPowerShellPath,
-    getShutdownPath: getShutdownPath
+    getShutdownPath: getShutdownPath,
+    shutdownCancelledMarker: SHUTDOWN_CANCELLED_MARKER
 };
